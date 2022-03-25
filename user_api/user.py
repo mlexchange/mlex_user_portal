@@ -112,7 +112,7 @@ class userAPI:
     
     def delete_user(self, uid):
         # How do one get the uid?
-        parameters = {'uid':uid}
+        parameters = {'uid': uid}
         cquery = '''
         match (u:user {uid:$uid})
         detach delete (u)
@@ -137,7 +137,7 @@ class userAPI:
 
 
     def delete_default_users(self):
-        uids = ['HYanxon00001', 'EHolman00002', 'HKrish0003', 'JSmith00004']
+        uids = ['HYanxon00001', 'EHolman00002', 'HKrish00003', 'JSmith00004']
         for uid in uids:
             status = self.delete_user(uid)
         return status
