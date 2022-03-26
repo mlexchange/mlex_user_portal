@@ -73,7 +73,7 @@ class userAPI:
         match (u:User) return u
         '''
         dbindx = len([dict(_) for _ in self.session.run(cquery)]) + 1
-        temp_id = str(fname[0] + lname + str(dbindx).zfill(5))
+        temp_id = 'u_' + str(fname[0] + lname + str(dbindx).zfill(5))
         
         profile_name = fname+'\'s Profile'
         parameters = {'temp_id': temp_id, 'fname': fname, 'lname': lname, 'email': email, 'role': role, 'profile_name': profile_name}
@@ -187,16 +187,17 @@ class userAPI:
 
 
     def delete_default_users(self):
-        uids = ['HYanxon00001', 'EHolman00002', 'HKrish00003', 'JSmith00004']
+        uids = ['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
         for uid in uids:
             status = self.delete_user(uid)
         return status
 
     
-    #def add_compute_location(self, cname, clocation):
-    #    parameters = {'cname': cname, 'clocation':clocation}
+    #def add_compute_location(self, name, location, profile=None):
+    #    parameters = {'name': name, 'location': location}
     #    cquery = '''
-    #    create (n:compute:Object:Location {cname: $cname, clocation:$clocation})
+    #    create (cr:ComputeResource:Object:Location {name: $name, location: $location})
+    #    merge (cr)-[:owner_of]->(
     #    '''
     #    status = self.session.run(cquery, parameters=parameters)
     #    return status
