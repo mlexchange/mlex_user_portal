@@ -16,6 +16,12 @@ class userAPI:
         # Initiate all roles
         for r in self.role_count.keys():
             status = self.create_role(r)
+        
+        ### For developing purpose. Delete MLExchange_Profile
+        self.delete_MLExchange_profile()
+
+        # Create MLExchange Profile
+        self.create_MLExchange_profile()
 
         # Initiate action: full access, read, write
         self.create_action()
@@ -26,8 +32,11 @@ class userAPI:
         self.add_default_users()
 
         ### For developing purpose
+        ### Add compute location
+
+        ### For developing purpose
         ### add_content_asset
-        self.add_content_asset('Model01', 'trained_model', 'HKrish00003')
+        #self.add_content_asset('Model01', 'trained_model', 'HKrish00003')
 
     
     def create_role(self, role):
@@ -66,14 +75,48 @@ class userAPI:
         dbindx = len([dict(_) for _ in self.session.run(cquery)]) + 1
         temp_id = str(fname[0] + lname + str(dbindx).zfill(5))
         
-        parameters = {'temp_id': temp_id, 'fname': fname, 'lname': lname, 'email': email, 'role': role}
-        cquery = '''
-        match (r:Role {name:$role})
-        create (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname, email:$email})-[:has_attr]->(r)
-        '''
+        profile_name = fname+'\'s Profile'
+        parameters = {'temp_id': temp_id, 'fname': fname, 'lname': lname, 'email': email, 'role': role, 'profile_name': profile_name}
+        if role == 'Admin':
+            cquery = '''
+            match (r:Role {name:$role})
+            match (ap:Profile {name: "MLExchange Profile"})
+            merge (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname})-[:has_attr]->(r)
+            // Create Profile for the user
+            merge (n)-[:owner_of]->(p:Profile:Object 
+            {name: $profile_name, uid: $temp_id, fname: $fname, lname: $lname, email: $email})
+            '''
+        else:
+            cquery = '''
+            match (r:Role {name:$role})
+            match (ap:Profile {name: "MLExchange Profile"})
+            merge (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname})-[:has_attr]->(r)
+            // Create Profile for the user
+            merge (n)-[:owner_of]->(p:Profile:Object 
+            {name: $profile_name, uid: $temp_id, fname: $fname, lname: $lname, email: $email})-[:has_attr]->(ap)
+            '''
         status = self.session.run(cquery, parameters=parameters)
         # Perhaps, we want to create new user without assigning role?
         # If this is the case, why don't General-User be the default?
+        return status
+
+    
+    def create_MLExchange_profile(self, name='MLExchange Profile'):
+        parameters = {'name': name}
+        cquery = '''
+        create (ap:Profile:Attribute {name: $name})
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
+
+
+    def delete_MLExchange_profile(self, name='MLExchange Profile'):
+        parameters = {'name': name}
+        cquery = '''
+        match (ap:Profile {name: $name})
+        detach delete ap
+        '''
+        status = self.session.run(cquery, parameters=parameters)
         return status
 
 
@@ -81,6 +124,7 @@ class userAPI:
         # I'm thinking that user node should only contains uid.
         # Meanwhile, we can create another node for the user that contains his/her profile. This node is called profile node.
         # Profile will include, but not limited to, first name, last name, email, institution, etc.
+        # I wonder if we need so make this separate from add_user because currently this function is included in add_user
         status = None
         return status
 
@@ -118,8 +162,10 @@ class userAPI:
         # How do one get the uid?
         parameters = {'uid': uid}
         cquery = '''
-        match (u:User {uid:$uid})
+        match (u:User {uid: $uid})
+        match (p:Profile {uid: $uid})
         detach delete (u)
+        detach delete (p)
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
