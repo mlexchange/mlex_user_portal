@@ -25,6 +25,10 @@ class userAPI:
         self.delete_default_users()
         self.add_default_users()
 
+        ### For developing purpose
+        ### add_content_asset
+        self.add_content_asset('Model01', 'trained_model', 'HKrish00003')
+
     
     def create_role(self, role):
         parameters = {'role': role}
@@ -57,7 +61,7 @@ class userAPI:
             msg = 'The assigned role is not in the system.\nPlease add the intended role to the system.'
             return ValueError(msg)
         cquery = '''
-        match (u:user) return u
+        match (u:User) return u
         '''
         dbindx = len([dict(_) for _ in self.session.run(cquery)]) + 1
         temp_id = str(fname[0] + lname + str(dbindx).zfill(5))
@@ -65,7 +69,7 @@ class userAPI:
         parameters = {'temp_id': temp_id, 'fname': fname, 'lname': lname, 'email': email, 'role': role}
         cquery = '''
         match (r:Role {name:$role})
-        create (n:Subject:user:Primitive {uid: $temp_id, fname:$fname, lname:$lname, email:$email})-[:has_attr]->(r)
+        create (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname, email:$email})-[:has_attr]->(r)
         '''
         status = self.session.run(cquery, parameters=parameters)
         # Perhaps, we want to create new user without assigning role?
@@ -93,7 +97,7 @@ class userAPI:
 
         parameters = {'uid': uid, 'rname': role}
         cquery = '''
-        match (u:user {uid:$uid}), (r:Role {name:$role})
+        match (u:User {uid:$uid}), (r:Role {name:$role})
         merge (u)-[:has_attr]->(r)
         '''
         status = self.session.run(cquery, parameters=parameters)
@@ -103,7 +107,7 @@ class userAPI:
     def delete_user_role(uid, role):
         parameters = {'uid': uid, 'role': role}
         cquery = '''
-        match (u:user {uid: $uid})-[rel:has_attr]->(r:Role {name:$role})
+        match (u:User {uid: $uid})-[rel:has_attr]->(r:Role {name:$role})
         delete rel
         '''
         status = self.session.run(cquery, parameters=parameters)
@@ -114,7 +118,7 @@ class userAPI:
         # How do one get the uid?
         parameters = {'uid': uid}
         cquery = '''
-        match (u:user {uid:$uid})
+        match (u:User {uid:$uid})
         detach delete (u)
         '''
         status = self.session.run(cquery, parameters=parameters)
@@ -143,24 +147,49 @@ class userAPI:
         return status
 
     
-    def add_compute_location(self, cname, clocation):
-        parameters = {'cname': cname, 'clocation':clocation}
-        cquery = '''
-        create (n:compute:Object:Location {cname: $cname, clocation:$clocation})
-        '''
-        status = self.session.run(cquery, parameters=parameters)
-        return status
+    #def add_compute_location(self, cname, clocation):
+    #    parameters = {'cname': cname, 'clocation':clocation}
+    #    cquery = '''
+    #    create (n:compute:Object:Location {cname: $cname, clocation:$clocation})
+    #    '''
+    #    status = self.session.run(cquery, parameters=parameters)
+    #    return status
 
 
-    def delete_compute_location(self, cname, clocation):
-        parameters = {'cname': cname, 'clocation':clocation}
-        cquery = '''
-        match (c:compute:Object:Location {cname:$cname, clocation:$clocation})
-        detach delete (c)
-        '''
-        status = self.session.run(cquery, parameters=parameters)
-        return status
+    #def delete_compute_location(self, cname, clocation):
+    #    parameters = {'cname': cname, 'clocation':clocation}
+    #    cquery = '''
+    #    match (c:compute:Object:Location {cname:$cname, clocation:$clocation})
+    #    detach delete (c)
+    #    '''
+    #    status = self.session.run(cquery, parameters=parameters)
+    #    return status
 
+    #
+    #def add_content_asset(self, aname, atype, owner):
+    #    auid = owner + '_'
+    #    owner_belonging = owner + '\'s' + atype
+
+    #    parameters = {'aname': owner_belonging, 'atype': atype, 'auid': auid, 'owner': owner}
+    #    cquery = '''
+    #    create (AssetOne:content:Group:Attribute {aname: $aname, atype: $atype, a_uid: toString(($auid)+toString(timestamp())), owner: $owner})
+    #    return AssetOne.a_uid
+    #    '''
+    #    a_uid = self.session.run(cquery, parameters=parameters)
+    #    print(a_uid.__dict__)
+    #    print(a_uid.a_uid)
+    #    import sys; sys.exit()
+    #    print(a_uid)
+    #
+    #    parameters = {'a_uid': a_uid}
+    #    cquery = '''
+    #    match (u:User {uid: $owner})
+    #    match (c:content {a_uid: $a_uid})
+    #    merge (u)-[:owner_of]->(c)<-[:has_attr]-(rec:Data:Object:Primitive {a_uid: $a_uid})
+    #    '''
+    #    status = self.session.run(cquery, parameters)
+    #    return status
+        
 
     def delete_content_asset(self):
         return
