@@ -8,7 +8,7 @@ class userAPI:
         self.driver  = GraphDatabase.driver(url, auth=basic_auth(self.auth[0], self.auth[1]))
         self.session = self.driver.session()
         #self.role_count = {'Admin': 0, 'Sub-Admin': 0, 'Developer': 0, 'General-User': 0}
-        self.role_count = {'Admin': 0, 'Developer': 0, 'General-User': 0}
+        self.role_count = {'Admin': 0, 'Developer': 0, 'MLE-User': 0, 'General-User': 0}
 
         ### For developing purpose (i.e. need to delete this when is stable)
         for r in self.role_count.keys():
@@ -39,8 +39,8 @@ class userAPI:
 
         ### For developing purpose
         ### Add a test policy
-        self.test_policy1()
-        self.test_policy2()
+        #self.test_policy1()
+        #self.test_policy2()
         
         ### For developing purpose
         ### add_content_asset
