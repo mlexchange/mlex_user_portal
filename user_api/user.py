@@ -7,7 +7,8 @@ class userAPI:
         self.auth    = auth
         self.driver  = GraphDatabase.driver(url, auth=basic_auth(self.auth[0], self.auth[1]))
         self.session = self.driver.session()
-        self.role_count = {'Admin': 0, 'Sub-Admin': 0, 'Developer': 0, 'General-User': 0}
+        #self.role_count = {'Admin': 0, 'Sub-Admin': 0, 'Developer': 0, 'General-User': 0}
+        self.role_count = {'Admin': 0, 'Developer': 0, 'General-User': 0}
 
         ### For developing purpose (i.e. need to delete this when is stable)
         for r in self.role_count.keys():
@@ -36,12 +37,14 @@ class userAPI:
         self.delete_compute_resource(cuid='c_MLSandbox00001')
         self.add_compute_resource(name='MLSandbox', location='Lawrence Berkeley National Laboratory', profile=None)
 
-
         ### For developing purpose
         ### add_content_asset
         #self.add_content_asset('Model01', 'trained_model', 'HKrish00003')
 
-    
+    def policy(xxx):
+        return
+
+
     def create_role(self, role):
         parameters = {'role': role}
         cquery = '''
@@ -202,7 +205,7 @@ class userAPI:
         we need to pass this information to the computing resource profile.
         """
         cquery = '''
-        match (u:User) return u
+        match (cr:ComputeResource) return cr
         '''
         dbindx = len([dict(_) for _ in self.session.run(cquery)]) + 1
         cuid = 'c_' + name + str(dbindx).zfill(5)
@@ -221,7 +224,7 @@ class userAPI:
     def delete_compute_resource(self, cuid):
         parameters = {'cuid': cuid}
         cquery = '''
-        match (c:ComputerResource {cuid: $cuid})
+        match (c:ComputeResource {cuid: $cuid})
         match (cp:ComputeResourceProfile {cuid: $cuid})
         detach delete (c)
         detach delete (cp)
