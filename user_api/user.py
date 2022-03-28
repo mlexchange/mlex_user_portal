@@ -38,11 +38,34 @@ class userAPI:
         self.add_compute_resource(name='MLSandbox', location='Lawrence Berkeley National Laboratory', profile=None)
 
         ### For developing purpose
+        ### Add a test policy
+        self.test_policy1()
+        self.test_policy2()
+        
+        ### For developing purpose
         ### add_content_asset
         #self.add_content_asset('Model01', 'trained_model', 'HKrish00003')
 
-    def policy(xxx):
-        return
+
+    def test_policy1(self):
+        ''' Admin have full access of profiles. '''
+        cquery = '''
+        /// Policy 1 - Admin has full access of profiles 
+        match (admin:Role {name: 'Admin'})
+        match (mp:MasterProfile {name: "MLExchange Profile"})
+        match (act:Attribute {name:"Full Access"})
+        create (pol:Policy {name: 'Policy1', decision: 'Permit'})
+        merge (pol)<-[:SUB_CON]-(admin)
+        merge (pol)<-[:OBJ_CON]-(mp)
+        merge (pol)<-[:ACT_CON]-(act);
+        '''
+        status = self.session.run(cquery)
+        return status
+
+
+    def test_policy2(self):
+        status = None
+        return status
 
 
     def create_role(self, role):
@@ -83,24 +106,24 @@ class userAPI:
         
         profile_name = fname+'\'s Profile'
         parameters = {'temp_id': temp_id, 'fname': fname, 'lname': lname, 'email': email, 'role': role, 'profile_name': profile_name}
-        if role == 'Admin':
-            cquery = '''
-            match (r:Role {name:$role})
-            match (ap:MasterProfile {name: "MLExchange Profile"})
-            merge (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname})-[:has_attr]->(r)
-            // Create Profile for the user
-            merge (n)-[:owner_of]->(p:UserProfile:Object 
-            {name: $profile_name, uid: $temp_id, fname: $fname, lname: $lname, email: $email})
-            '''
-        else:
-            cquery = '''
-            match (r:Role {name:$role})
-            match (ap:MasterProfile {name: "MLExchange Profile"})
-            merge (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname})-[:has_attr]->(r)
-            // Create Profile for the user
-            merge (n)-[:owner_of]->(p:UserProfile:Object 
-            {name: $profile_name, uid: $temp_id, fname: $fname, lname: $lname, email: $email})-[:has_attr]->(ap)
-            '''
+        #if role == 'Admin':
+        #    cquery = '''
+        #    match (r:Role {name:$role})
+        #    match (ap:MasterProfile {name: "MLExchange Profile"})
+        #    merge (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname})-[:has_attr]->(r)
+        #    // Create Profile for the user
+        #    merge (n)-[:owner_of]->(p:UserProfile:Object 
+        #    {name: $profile_name, uid: $temp_id, fname: $fname, lname: $lname, email: $email})
+        #    '''
+        #else:
+        cquery = '''
+        match (r:Role {name:$role})
+        match (ap:MasterProfile {name: "MLExchange Profile"})
+        merge (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname})-[:has_attr]->(r)
+        // Create Profile for the user
+        merge (n)-[:owner_of]->(p:UserProfile:Object 
+        {name: $profile_name, uid: $temp_id, fname: $fname, lname: $lname, email: $email})-[:has_attr]->(ap)
+        '''
         status = self.session.run(cquery, parameters=parameters)
         # Perhaps, we want to create new user without assigning role?
         # If this is the case, why don't General-User be the default?
