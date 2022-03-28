@@ -33,6 +33,9 @@ class userAPI:
 
         ### For developing purpose
         ### Add compute location
+        self.delete_compute_resource(cuid='c_MLSandbox00001')
+        self.add_compute_resource(name='MLSandbox', location='Lawrence Berkeley National Laboratory', profile=None)
+
 
         ### For developing purpose
         ### add_content_asset
@@ -80,19 +83,19 @@ class userAPI:
         if role == 'Admin':
             cquery = '''
             match (r:Role {name:$role})
-            match (ap:Profile {name: "MLExchange Profile"})
+            match (ap:MasterProfile {name: "MLExchange Profile"})
             merge (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname})-[:has_attr]->(r)
             // Create Profile for the user
-            merge (n)-[:owner_of]->(p:Profile:Object 
+            merge (n)-[:owner_of]->(p:UserProfile:Object 
             {name: $profile_name, uid: $temp_id, fname: $fname, lname: $lname, email: $email})
             '''
         else:
             cquery = '''
             match (r:Role {name:$role})
-            match (ap:Profile {name: "MLExchange Profile"})
+            match (ap:MasterProfile {name: "MLExchange Profile"})
             merge (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname})-[:has_attr]->(r)
             // Create Profile for the user
-            merge (n)-[:owner_of]->(p:Profile:Object 
+            merge (n)-[:owner_of]->(p:UserProfile:Object 
             {name: $profile_name, uid: $temp_id, fname: $fname, lname: $lname, email: $email})-[:has_attr]->(ap)
             '''
         status = self.session.run(cquery, parameters=parameters)
@@ -104,7 +107,7 @@ class userAPI:
     def create_MLExchange_profile(self, name='MLExchange Profile'):
         parameters = {'name': name}
         cquery = '''
-        create (ap:Profile:Attribute {name: $name})
+        create (ap:MasterProfile:Attribute {name: $name})
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
@@ -113,7 +116,7 @@ class userAPI:
     def delete_MLExchange_profile(self, name='MLExchange Profile'):
         parameters = {'name': name}
         cquery = '''
-        match (ap:Profile {name: $name})
+        match (ap:MasterProfile {name: $name})
         detach delete ap
         '''
         status = self.session.run(cquery, parameters=parameters)
@@ -163,7 +166,7 @@ class userAPI:
         parameters = {'uid': uid}
         cquery = '''
         match (u:User {uid: $uid})
-        match (p:Profile {uid: $uid})
+        match (p:UserProfile {uid: $uid})
         detach delete (u)
         detach delete (p)
         '''
@@ -193,24 +196,41 @@ class userAPI:
         return status
 
     
-    #def add_compute_location(self, name, location, profile=None):
-    #    parameters = {'name': name, 'location': location}
-    #    cquery = '''
-    #    create (cr:ComputeResource:Object:Location {name: $name, location: $location})
-    #    merge (cr)-[:owner_of]->(
-    #    '''
-    #    status = self.session.run(cquery, parameters=parameters)
-    #    return status
+    def add_compute_resource(self, name, location, profile=None):
+        """
+        We need to work on the profile argument. Essentially, profile contain ngpu, ncpu, etc. Then,
+        we need to pass this information to the computing resource profile.
+        """
+        cquery = '''
+        match (u:User) return u
+        '''
+        dbindx = len([dict(_) for _ in self.session.run(cquery)]) + 1
+        cuid = 'c_' + name + str(dbindx).zfill(5)
+        profile_name = name + '\'s Profile'
+
+        parameters = {'name': name, 'location': location, 'cuid': cuid, 'profile_name': profile_name, 'profile': 'None'}
+        cquery = '''
+        match (ap:MasterProfile {name: "MLExchange Profile"})
+        create (cr:ComputeResource:Object {name: $name, cuid: $cuid})
+        merge (cr)-[:owner_of]->(cp:ComputeResourceProfile:Object {cuid: $cuid, profile_name: $profile_name, location: $location, profile: $profile})-[:has_attr]->(ap)
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
 
 
-    #def delete_compute_location(self, cname, clocation):
-    #    parameters = {'cname': cname, 'clocation':clocation}
-    #    cquery = '''
-    #    match (c:compute:Object:Location {cname:$cname, clocation:$clocation})
-    #    detach delete (c)
-    #    '''
-    #    status = self.session.run(cquery, parameters=parameters)
-    #    return status
+    def delete_compute_resource(self, cuid):
+        parameters = {'cuid': cuid}
+        cquery = '''
+        match (c:ComputerResource {cuid: $cuid})
+        match (cp:ComputeResourceProfile {cuid: $cuid})
+        detach delete (c)
+        detach delete (cp)
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
+
+
+    # Connect FullAccess Action to 
 
     #
     #def add_content_asset(self, aname, atype, owner):
@@ -258,8 +278,8 @@ class userAPI:
 
 
 if __name__ == '__main__':
-    api = userAPI(url="bolt://100.27.25.207:7687",
-                  auth=("neo4j", "articles-researchers-accordance"))
+    api = userAPI(url="bolt://54.173.171.182:7687",
+                  auth=("neo4j", "consolidation-taxis-icing"))
     api.driver.close()
 
     ### Need to verify if each of the methods in the userAPI class are working
