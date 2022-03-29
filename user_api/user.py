@@ -38,10 +38,10 @@ class userAPI:
 
         ### For developing purpose
         ### Add Team
-        #self.add_team('MLExchange_Team')
-        #self.remove_team('MLExchange_Team')
-        #self.assign_user_team(uid='u_HKrish00003', team_name='MLExchange_Team')
-        self.remove_user_team(uid='u_HKrish00003', team_name='MLExchange_Team')
+        self.remove_team('MLExchange_Team')
+        self.add_team('MLExchange_Team')
+        self.assign_user_team(uid='u_HKrish00003', team_name='MLExchange_Team')
+        #self.remove_user_team(uid='u_HKrish00003', team_name='MLExchange_Team')
 
         ### For developing purpose
         ### Add a test policy
@@ -308,7 +308,7 @@ class userAPI:
         '''
         status = self.session.run(cquery, parameters=parameters)
         is_present = status.single()[0]
-        print(is_present)
+        #print(is_present)
 
         if not is_present:
             cquery = '''
@@ -331,7 +331,7 @@ class userAPI:
         '''
         status = self.session.run(cquery, parameters=parameters)
         is_present = status.single()[0]
-        print(is_present)
+        #print(is_present)
 
         parameters = {'uid': uid, 'name': team_name}
         cquery = '''
@@ -340,13 +340,6 @@ class userAPI:
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
-
-
-    # Test both assign_user_team and remove_user_team
-
-
-
-
 
 
     #def add_content_asset(self, aname, atype, owner):
