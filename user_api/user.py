@@ -7,7 +7,6 @@ class userAPI:
         self.auth    = auth
         self.driver  = GraphDatabase.driver(url, auth=basic_auth(self.auth[0], self.auth[1]))
         self.session = self.driver.session()
-        #self.role_count = {'Admin': 0, 'Sub-Admin': 0, 'Developer': 0, 'General-User': 0}
         self.role_count = {'Admin': 0, 'Developer': 0, 'MLE-User': 0, 'General-User': 0}
 
         ### For developing purpose (i.e. need to delete this when is stable)
@@ -38,6 +37,13 @@ class userAPI:
         self.add_compute_resource(name='MLSandbox', location='Lawrence Berkeley National Laboratory', profile=None)
 
         ### For developing purpose
+        ### Add Team
+        #self.add_team('MLExchange_Team')
+        #self.remove_team('MLExchange_Team')
+        #self.assign_user_team(uid='u_HKrish00003', team_name='MLExchange_Team')
+        self.remove_user_team(uid='u_HKrish00003', team_name='MLExchange_Team')
+
+        ### For developing purpose
         ### Add a test policy
         #self.test_policy1()
         #self.test_policy2()
@@ -45,7 +51,7 @@ class userAPI:
         ### For developing purpose
         ### add_content_asset
         #self.add_content_asset('Model01', 'trained_model', 'HKrish00003')
-
+                
 
     def test_policy1(self):
         ''' Admin have full access of profiles. '''
@@ -95,9 +101,11 @@ class userAPI:
        
 
     def add_user(self, fname, lname, email, role='General-User'):
+        ''' A function to add user node. Every user is assigned as General-User after sign-up. '''
+        
         if role not in self.role_count:
             msg = 'The assigned role is not in the system.\nPlease add the intended role to the system.'
-            return ValueError(msg)
+            raise ValueError(msg)
         cquery = '''
         match (u:User) return u
         '''
@@ -106,27 +114,16 @@ class userAPI:
         
         profile_name = fname+'\'s Profile'
         parameters = {'temp_id': temp_id, 'fname': fname, 'lname': lname, 'email': email, 'role': role, 'profile_name': profile_name}
-        #if role == 'Admin':
-        #    cquery = '''
-        #    match (r:Role {name:$role})
-        #    match (ap:MasterProfile {name: "MLExchange Profile"})
-        #    merge (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname})-[:has_attr]->(r)
-        #    // Create Profile for the user
-        #    merge (n)-[:owner_of]->(p:UserProfile:Object 
-        #    {name: $profile_name, uid: $temp_id, fname: $fname, lname: $lname, email: $email})
-        #    '''
-        #else:
+        
         cquery = '''
         match (r:Role {name:$role})
         match (ap:MasterProfile {name: "MLExchange Profile"})
         merge (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname})-[:has_attr]->(r)
-        // Create Profile for the user
+        // Create user's profile
         merge (n)-[:owner_of]->(p:UserProfile:Object 
         {name: $profile_name, uid: $temp_id, fname: $fname, lname: $lname, email: $email})-[:has_attr]->(ap)
         '''
         status = self.session.run(cquery, parameters=parameters)
-        # Perhaps, we want to create new user without assigning role?
-        # If this is the case, why don't General-User be the default?
         return status
 
     
@@ -159,6 +156,7 @@ class userAPI:
 
     
     def assign_user_role(self, uid, role, prev_role=None):
+        ''' This method is to assign a user to a role. '''
         # If the role is already general-user, do nothing
         if role == 'General-User':
             return None
@@ -178,6 +176,8 @@ class userAPI:
 
 
     def delete_user_role(uid, role):
+        # This function should not need role as an argument.
+        # Neo4j should know the role that is attached to the user.
         parameters = {'uid': uid, 'role': role}
         cquery = '''
         match (u:User {uid: $uid})-[rel:has_attr]->(r:Role {name:$role})
@@ -256,9 +256,99 @@ class userAPI:
         return status
 
 
-    # Connect FullAccess Action to 
+    def add_team(self, name):
+        cquery = '''
+        match (t:Team {name: $name})
+        return exists(t.name) as is_present
+        '''
+        status = self.session.run(cquery, parameters={'name': name})
+        is_present = False
+        for s in status: is_present = s['is_present']
+        
+        if is_present:
+            msg = 'The team name is already existed.'
+            raise ValueError(msg)
 
-    #
+        cquery = '''
+        create (t:Team:Attribute {name: $name})
+        '''
+        status = self.session.run(cquery, parameters={'name': name})
+        return status
+
+
+    def remove_team(self, name):
+        cquery = '''
+        match (t:Team {name: $name})
+        return exists(t.name) as is_present
+        '''
+        status = self.session.run(cquery, parameters={'name': name})
+        is_present = False
+        for s in status: is_present = s['is_present']
+        
+        if not is_present:
+            msg = 'The team name doesn\'t exist.'
+            raise ValueError(msg)
+
+        cquery = '''
+        match (t:Team {name: $name})
+        detach delete t
+        '''
+        status = self.session.run(cquery, parameters={'name': name})
+        return status
+
+
+    def assign_user_team(self, uid, team_name):
+        ''' This method is to assign a user to a team. '''
+        # When check if the relationship exist, it always return False
+        # If relationship is there it will break the relationship
+        parameters = {'uid': uid, 'name': team_name}
+        cquery = '''
+        match (u:User {uid: $uid}), (t:Team {name: $name})
+        return exists((u)-[:has_attr]-(t)) as is_present
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        is_present = status.single()[0]
+        print(is_present)
+
+        if not is_present:
+            cquery = '''
+            match (u:User {uid: $uid})
+            match (t:Team {name: $name})
+            merge (u)-[:has_attr]->(t)
+            '''
+            status = self.session.run(cquery, parameters=parameters)
+        return status
+
+
+    def remove_user_team(self, uid, team_name):
+        ''' This method is to remove a user from a team. '''
+        # When check if the relationship exist, it always return False
+        # If relationship is there it will break the relationship
+        parameters = {'uid': uid, 'name': team_name}
+        cquery = '''
+        match (u:User {uid: $uid}), (t:Team {name: $name})
+        return exists((u)-[:has_attr]-(t)) as is_present
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        is_present = status.single()[0]
+        print(is_present)
+
+        parameters = {'uid': uid, 'name': team_name}
+        cquery = '''
+        match (u:User {uid: $uid})-[r:has_attr]->(t:Team {name: $name})
+        delete r
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
+
+
+    # Test both assign_user_team and remove_user_team
+
+
+
+
+
+
     #def add_content_asset(self, aname, atype, owner):
     #    auid = owner + '_'
     #    owner_belonging = owner + '\'s' + atype
@@ -288,18 +378,6 @@ class userAPI:
         return
 
     def delete_user_asset(self):
-        return
-
-    def add_user_team(self):
-        return
-
-    def create_user_team(self):
-        return
-
-    def delete_user_team(self):
-        return
-
-    def remove_user_team(self):
         return
 
 
