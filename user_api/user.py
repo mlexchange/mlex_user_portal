@@ -19,9 +19,11 @@ class userAPI:
         
         ### For developing purpose. Delete MLExchange_Profile
         self.delete_MLExchange_profile()
+        self.delete_MLExchange_asset()
 
-        # Create MLExchange Profile
+        # Create MLExchange Profile and MLExchange Asset
         self.create_MLExchange_profile()
+        self.create_MLExchange_asset()
 
         # Initiate action: full access, read, write
         self.create_action()
@@ -38,7 +40,7 @@ class userAPI:
 
         ### For developing purpose
         ### Add Team
-        self.remove_team('MLExchange_Team')
+        #self.remove_team('MLExchange_Team')
         self.add_team('MLExchange_Team')
         self.assign_user_team(uid='u_HKrish00003', team_name='MLExchange_Team')
         #self.remove_user_team(uid='u_HKrish00003', team_name='MLExchange_Team')
@@ -50,8 +52,16 @@ class userAPI:
         
         ### For developing purpose
         ### add_content_asset
-        #self.add_content_asset('Model01', 'trained_model', 'HKrish00003')
-                
+        self.add_content_asset(asset_name='Asset_00001', asset_owner='u_HKrish00003', asset_type='Trained_Model', asset_path='HERE')
+        #self.remove_content_asset(asset_uid=None, asset_name='Asset_00001')
+        
+        #['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
+        self.add_user_content_asset(user_uid='u_JSmith00004', asset_uid=None, asset_name=None, to_master=True)
+        self.add_user_content_asset(user_uid='u_HYanxon00001', asset_name='Asset_00001', to_master=False)
+
+        #self.remove_user_content_asset(user_uid='u_JSmith00004', from_master=True)
+        #self.remove_user_content_asset(user_uid='u_HYanxon00001', asset_name='Asset_00001')
+
 
     def test_policy1(self):
         ''' Admin have full access of profiles. '''
@@ -237,7 +247,7 @@ class userAPI:
         parameters = {'name': name, 'location': location, 'cuid': cuid, 'profile_name': profile_name, 'profile': 'None'}
         cquery = '''
         match (ap:MasterProfile {name: "MLExchange Profile"})
-        create (cr:ComputeResource:Object {name: $name, cuid: $cuid})
+        create (cr:ComputeResource:Object:Primitive {name: $name, cuid: $cuid})
         merge (cr)-[:owner_of]->(cp:ComputeResourceProfile:Object {cuid: $cuid, profile_name: $profile_name, location: $location, profile: $profile})-[:has_attr]->(ap)
         '''
         status = self.session.run(cquery, parameters=parameters)
@@ -342,41 +352,159 @@ class userAPI:
         return status
 
 
-    #def add_content_asset(self, aname, atype, owner):
-    #    auid = owner + '_'
-    #    owner_belonging = owner + '\'s' + atype
+    def create_MLExchange_asset(self, name='MLExchange Asset'):
+        parameters = {'name': name}
+        cquery = '''
+        create (ma:MasterAsset:Attribute {name: $name})
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
 
-    #    parameters = {'aname': owner_belonging, 'atype': atype, 'auid': auid, 'owner': owner}
-    #    cquery = '''
-    #    create (AssetOne:content:Group:Attribute {aname: $aname, atype: $atype, a_uid: toString(($auid)+toString(timestamp())), owner: $owner})
-    #    return AssetOne.a_uid
-    #    '''
-    #    a_uid = self.session.run(cquery, parameters=parameters)
-    #    print(a_uid.__dict__)
-    #    print(a_uid.a_uid)
-    #    import sys; sys.exit()
-    #    print(a_uid)
-    #
-    #    parameters = {'a_uid': a_uid}
-    #    cquery = '''
-    #    match (u:User {uid: $owner})
-    #    match (c:content {a_uid: $a_uid})
-    #    merge (u)-[:owner_of]->(c)<-[:has_attr]-(rec:Data:Object:Primitive {a_uid: $a_uid})
-    #    '''
-    #    status = self.session.run(cquery, parameters)
-    #    return status
+
+    def delete_MLExchange_asset(self, name='MLExchange Asset'):
+        parameters = {'name': name}
+        cquery = '''
+        match (ma:MasterAsset {name: $name})
+        detach delete ma
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
+
+
+    def add_content_asset(self, asset_name, asset_owner, asset_type, asset_path):
+        # Set up asset node
+        asset_uid = 'a' + asset_owner[1:] + '_'
+        parameters = {'asset_name': asset_name, 'auid': asset_uid, 'asset_owner': asset_owner, 'asset_path': asset_path, 'asset_type': asset_type}
+        cquery = '''
+        match (u:User {uid: $asset_owner})
+        match (ma:MasterAsset {name: "MLExchange Asset"})
+        create (ass:Asset:Object:Primitive 
+        {asset_name: $asset_name, asset_uid: toString(($auid)+toString(timestamp())), asset_owner: $asset_owner, asset_path: $asset_path,asset_type: $asset_type})
+        merge (u)-[:owner_of]->(ass)-[:has_attr]->(ma)
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
+
+
+    def remove_content_asset(self, asset_uid=None, asset_name=None):
+        parameters = {'asset_name': asset_name, 'asset_uid': asset_uid}
+        if asset_uid:
+            cquery = '''
+            match (ass:Asset {asset_uid: $asset_uid})
+            detach delete ass
+            '''
+        else:
+            cquery = '''
+            match (ass:Asset {asset_name: $asset_name})
+            detach delete ass
+            '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
+
+
+    def add_user_content_asset(self, user_uid, asset_uid=None, asset_name=None, to_master=False):
+        if to_master:
+            parameters = {'asset_name': 'MLExchange Asset', 'user_uid': user_uid}
+            cquery = '''
+            match (ma:MasterAsset {name: $asset_name})
+            match (u:User {uid: $user_uid})
+            merge (u)-[:can_access]->(ma)
+            '''
+            status = self.session.run(cquery, parameters=parameters)
         
+        else:
+            parameters = {'asset_name': asset_name, 'asset_uid': asset_uid, 'user_uid': user_uid}
+            if asset_uid:
+                cquery = '''
+                match (ass:Asset {asset_uid: $asset_uid})
+                match (u:User {uid: $user_uid})
+                merge (u)-[:can_access]->(ass)
+                '''
+            else:
+                cquery = '''
+                match (ass:Asset {asset_name: $asset_name})
+                match (u:User {uid: $user_uid})
+                merge (u)-[:can_access]->(ass)
+                '''
+            status = self.session.run(cquery, parameters=parameters)
 
-    def delete_content_asset(self):
-        return
+        return status
 
-    def delete_user_asset(self):
-        return
+
+    def remove_user_content_asset(self, user_uid, asset_uid=None, asset_name=None, from_master=False):
+        if from_master:
+            parameters = {'asset_name': 'MLExchange Asset', 'user_uid': user_uid}
+            cquery = '''
+            match (u:User {uid: $user_uid})-[rel:can_access]->(ma:MasterAsset {name: $asset_name})
+            delete rel
+            '''
+            status = self.session.run(cquery, parameters=parameters)
+
+        else:
+            parameters = {'asset_name': asset_name, 'asset_uid': asset_uid, 'user_uid': user_uid}
+            if asset_uid:
+                cquery = '''
+                match (u:User {uid: $user_uid})-[rel:can_access]->(ass:Asset {asset_uid: $asset_uid})
+                delete rel
+                '''
+            else:
+                cquery = '''
+                match (u:User {uid: $user_uid})-[rel:can_access]->(ass:Asset {asset_name: $asset_name})
+                delete rel
+                '''
+            status = self.session.run(cquery, parameters=parameters)
+
+        return status
+
+
+    def find_all_users(self):
+        cquery = '''
+        match (u:User)
+        return u
+        '''
+        status = self.session.run(cquery).data()
+        return [s['u'] for s in status]
+
+    
+    def find_all_assets(self):
+        cquery = '''
+        match (ass:Asset)
+        return ass
+        '''
+        status = self.session.run(cquery).data()
+        return [s['ass'] for s in status]
+
+
+    def find_all_roles(self):
+        cquery = '''
+        match (r:Role)
+        return r
+        '''
+        status = self.session.run(cquery).data()
+        return [s['r'] for s in status]
+
+
+    def find_all_computing_resources(self):
+        cquery = '''
+        match (cr:ComputeResource)
+        return cr
+        '''
+        status = self.session.run(cquery).data()
+        return [s['cr'] for s in status]
+
+
+    def find_all_team(self):
+        cquery = '''
+        match (t:Team)
+        return t
+        '''
+        status = self.session.run(cquery).data()
+        return [s['t'] for s in status]
+
+
+    # Make policy
 
 
 if __name__ == '__main__':
-    api = userAPI(url="bolt://54.173.171.182:7687",
-                  auth=("neo4j", "consolidation-taxis-icing"))
+    api = userAPI(url="bolt://54.173.171.182:7687", auth=("neo4j", "consolidation-taxis-icing"))
     api.driver.close()
-
-    ### Need to verify if each of the methods in the userAPI class are working
