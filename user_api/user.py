@@ -403,12 +403,13 @@ class userAPI:
 
 
     def add_user_content_asset(self, user_uid, asset_uid=None, asset_name=None, to_master=False):
+        ''' Add a user to access an asset. '''
         if to_master:
             parameters = {'asset_name': 'MLExchange Asset', 'user_uid': user_uid}
             cquery = '''
             match (ma:MasterAsset {name: $asset_name})
             match (u:User {uid: $user_uid})
-            merge (u)-[:can_access]->(ma)
+            merge (u)-[:has_attr]->(ma)
             '''
             status = self.session.run(cquery, parameters=parameters)
         
@@ -418,13 +419,13 @@ class userAPI:
                 cquery = '''
                 match (ass:Asset {asset_uid: $asset_uid})
                 match (u:User {uid: $user_uid})
-                merge (u)-[:can_access]->(ass)
+                merge (u)-[:has_attr]->(ass)
                 '''
             else:
                 cquery = '''
                 match (ass:Asset {asset_name: $asset_name})
                 match (u:User {uid: $user_uid})
-                merge (u)-[:can_access]->(ass)
+                merge (u)-[:has_attr]->(ass)
                 '''
             status = self.session.run(cquery, parameters=parameters)
 
@@ -435,7 +436,7 @@ class userAPI:
         if from_master:
             parameters = {'asset_name': 'MLExchange Asset', 'user_uid': user_uid}
             cquery = '''
-            match (u:User {uid: $user_uid})-[rel:can_access]->(ma:MasterAsset {name: $asset_name})
+            match (u:User {uid: $user_uid})-[rel:has_attr]->(ma:MasterAsset {name: $asset_name})
             delete rel
             '''
             status = self.session.run(cquery, parameters=parameters)
@@ -444,12 +445,12 @@ class userAPI:
             parameters = {'asset_name': asset_name, 'asset_uid': asset_uid, 'user_uid': user_uid}
             if asset_uid:
                 cquery = '''
-                match (u:User {uid: $user_uid})-[rel:can_access]->(ass:Asset {asset_uid: $asset_uid})
+                match (u:User {uid: $user_uid})-[rel:has_attr]->(ass:Asset {asset_uid: $asset_uid})
                 delete rel
                 '''
             else:
                 cquery = '''
-                match (u:User {uid: $user_uid})-[rel:can_access]->(ass:Asset {asset_name: $asset_name})
+                match (u:User {uid: $user_uid})-[rel:has_attr]->(ass:Asset {asset_name: $asset_name})
                 delete rel
                 '''
             status = self.session.run(cquery, parameters=parameters)
@@ -457,7 +458,7 @@ class userAPI:
         return status
 
 
-    def find_all_users(self):
+    def get_all_users(self):
         cquery = '''
         match (u:User)
         return u
@@ -465,8 +466,13 @@ class userAPI:
         status = self.session.run(cquery).data()
         return [s['u'] for s in status]
 
+
+    def get_user_profile(self):
+        ''' '''
+        return user_profile_node
+
     
-    def find_all_assets(self):
+    def get_all_assets(self):
         cquery = '''
         match (ass:Asset)
         return ass
@@ -475,7 +481,7 @@ class userAPI:
         return [s['ass'] for s in status]
 
 
-    def find_all_roles(self):
+    def get_all_roles(self):
         cquery = '''
         match (r:Role)
         return r
@@ -484,7 +490,7 @@ class userAPI:
         return [s['r'] for s in status]
 
 
-    def find_all_computing_resources(self):
+    def get_all_computing_resources(self):
         cquery = '''
         match (cr:ComputeResource)
         return cr
@@ -493,7 +499,7 @@ class userAPI:
         return [s['cr'] for s in status]
 
 
-    def find_all_team(self):
+    def get_all_team(self):
         cquery = '''
         match (t:Team)
         return t
