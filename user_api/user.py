@@ -7,7 +7,7 @@ class userAPI:
         self.auth    = auth
         self.driver  = GraphDatabase.driver(url, auth=basic_auth(self.auth[0], self.auth[1]))
         self.session = self.driver.session()
-        self.role_count = {'Admin': 0, 'Developer': 0, 'MLE-User': 0, 'General-User': 0}
+        self.role_count = {'Admin': 0, 'MLE Admin': 0, 'MLE User': 0, 'General User': 0}
 
         ### For developing purpose (i.e. need to delete this when is stable)
         for r in self.role_count.keys():
@@ -18,12 +18,12 @@ class userAPI:
             status = self.create_role(r)
         
         ### For developing purpose. Delete MLExchange_Profile
-        self.delete_MLExchange_profile()
-        self.delete_MLExchange_asset()
+        self.delete_mlex_profile()
+        self.delete_mlex_asset()
 
         # Create MLExchange Profile and MLExchange Asset
-        self.create_MLExchange_profile()
-        self.create_MLExchange_asset()
+        self.create_mlex_profile()
+        self.create_mlex_asset()
 
         # Initiate action: full access, read, write
         self.create_action()
@@ -42,8 +42,8 @@ class userAPI:
         ### Add Team
         #self.remove_team('MLExchange_Team')
         self.add_team('MLExchange_Team')
-        self.assign_user_team(uid='u_HKrish00003', team_name='MLExchange_Team')
-        #self.remove_user_team(uid='u_HKrish00003', team_name='MLExchange_Team')
+        self.assign_user_team(uuid='u_HKrish00003', team_name='MLExchange_Team')
+        #self.remove_user_team(uuid='u_HKrish00003', team_name='MLExchange_Team')
 
         ### For developing purpose
         ### Add a test policy
@@ -56,11 +56,11 @@ class userAPI:
         #self.remove_content_asset(asset_uid=None, asset_name='Asset_00001')
         
         #['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
-        self.add_user_content_asset(user_uid='u_JSmith00004', asset_uid=None, asset_name=None, to_master=True)
-        self.add_user_content_asset(user_uid='u_HYanxon00001', asset_name='Asset_00001', to_master=False)
+        self.add_user_content_asset(uuid='u_JSmith00004', asset_uid=None, asset_name=None, to_master=True)
+        self.add_user_content_asset(uuid='u_HYanxon00001', asset_name='Asset_00001', to_master=False)
 
-        #self.remove_user_content_asset(user_uid='u_JSmith00004', from_master=True)
-        #self.remove_user_content_asset(user_uid='u_HYanxon00001', asset_name='Asset_00001')
+        #self.remove_user_content_asset(uuid='u_JSmith00004', from_master=True)
+        #self.remove_user_content_asset(uuid='u_HYanxon00001', asset_name='Asset_00001')
 
 
     def test_policy1(self):
@@ -110,8 +110,8 @@ class userAPI:
         return status
        
 
-    def add_user(self, fname, lname, email, role='General-User'):
-        ''' A function to add user node. Every user is assigned as General-User after sign-up. '''
+    def add_user(self, fname, lname, email, role='General User'):
+        ''' A function to add user node. Every user is assigned as General User after sign-up. '''
         
         if role not in self.role_count:
             msg = 'The assigned role is not in the system.\nPlease add the intended role to the system.'
@@ -127,29 +127,29 @@ class userAPI:
         
         cquery = '''
         match (r:Role {name:$role})
-        match (ap:MasterProfile {name: "MLExchange Profile"})
-        merge (n:Subject:User:Primitive {uid: $temp_id, fname:$fname, lname:$lname})-[:has_attr]->(r)
+        match (ap:MlexProfile {name: "MLExchange Profile"})
+        merge (n:Subject:User:Primitive {uuid: $temp_id})-[:has_attr]->(r)
         // Create user's profile
         merge (n)-[:owner_of]->(p:UserProfile:Object 
-        {name: $profile_name, uid: $temp_id, fname: $fname, lname: $lname, email: $email})-[:has_attr]->(ap)
+        {name: $profile_name, uuid: $temp_id, fname: $fname, lname: $lname, email: $email})-[:has_attr]->(ap)
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
 
     
-    def create_MLExchange_profile(self, name='MLExchange Profile'):
+    def create_mlex_profile(self, name='MLExchange Profile'):
         parameters = {'name': name}
         cquery = '''
-        create (ap:MasterProfile:Attribute {name: $name})
+        create (ap:MlexProfile:Attribute {name: $name})
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
 
 
-    def delete_MLExchange_profile(self, name='MLExchange Profile'):
+    def delete_mlex_profile(self, name='MLExchange Profile'):
         parameters = {'name': name}
         cquery = '''
-        match (ap:MasterProfile {name: $name})
+        match (ap:MlexProfile {name: $name})
         detach delete ap
         '''
         status = self.session.run(cquery, parameters=parameters)
@@ -157,7 +157,7 @@ class userAPI:
 
 
     def create_user_profile(self):
-        # I'm thinking that user node should only contains uid.
+        # I'm thinking that user node should only contains uuid.
         # Meanwhile, we can create another node for the user that contains his/her profile. This node is called profile node.
         # Profile will include, but not limited to, first name, last name, email, institution, etc.
         # I wonder if we need so make this separate from add_user because currently this function is included in add_user
@@ -165,7 +165,7 @@ class userAPI:
         return status
 
     
-    def assign_user_role(self, uid, role, prev_role=None):
+    def assign_user_role(self, uuid, role, prev_role=None):
         ''' This method is to assign a user to a role. '''
         # If the role is already general-user, do nothing
         if role == 'General-User':
@@ -174,35 +174,36 @@ class userAPI:
         # If one user is assigned to one role, then:
         # Delete relationship with the previous role
         if prev_role:
-            self.delete_user_role(uid, prev_role)
+            self.delete_user_role(uuid, prev_role)
 
-        parameters = {'uid': uid, 'rname': role}
+        parameters = {'uuid': uuid, 'rname': role}
         cquery = '''
-        match (u:User {uid:$uid}), (r:Role {name:$role})
+        match (u:User {uuid:$uuid}), (r:Role {name:$role})
         merge (u)-[:has_attr]->(r)
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
 
 
-    def delete_user_role(uid, role):
+    def delete_user_role(uuid, role):
         # This function should not need role as an argument.
         # Neo4j should know the role that is attached to the user.
-        parameters = {'uid': uid, 'role': role}
+        parameters = {'uuid': uuid, 'role': role}
         cquery = '''
-        match (u:User {uid: $uid})-[rel:has_attr]->(r:Role {name:$role})
+        match (u:User {uuid: $uuid})-[rel:has_attr]->(r:Role {name:$role})
         delete rel
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
 
     
-    def delete_user(self, uid):
+    def delete_user(self, uuid):
         # How do one get the uid?
-        parameters = {'uid': uid}
+        # we are changing this to archive
+        parameters = {'uuid': uuid}
         cquery = '''
-        match (u:User {uid: $uid})
-        match (p:UserProfile {uid: $uid})
+        match (u:User {uuid: $uuid})
+        match (p:UserProfile {uuid: $uuid})
         detach delete (u)
         detach delete (p)
         '''
@@ -219,16 +220,16 @@ class userAPI:
 
     
     def add_default_users(self):
-        self.add_user('Howard', 'Yanxon', 'hg.yanxon@gmail.com', 'Developer')
-        self.add_user('Elizabeth', 'Holman', 'liz@gmail.com', 'Developer')
+        self.add_user('Howard', 'Yanxon', 'hg.yanxon@gmail.com', 'MLE Admin')
+        self.add_user('Elizabeth', 'Holman', 'liz@gmail.com', 'MLE Admin')
         self.add_user('Hari', 'Krish', 'krish@gmail.com', 'Admin')
-        self.add_user('John', 'Smith', 'smithj123@gmail.com', 'General-User')
+        self.add_user('John', 'Smith', 'smithj123@gmail.com', 'General User')
 
 
     def delete_default_users(self):
-        uids = ['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
-        for uid in uids:
-            status = self.delete_user(uid)
+        uuids = ['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
+        for uuid in uuids:
+            status = self.delete_user(uuid)
         return status
 
     
@@ -307,13 +308,13 @@ class userAPI:
         return status
 
 
-    def assign_user_team(self, uid, team_name):
+    def assign_user_team(self, uuid, team_name):
         ''' This method is to assign a user to a team. '''
         # When check if the relationship exist, it always return False
         # If relationship is there it will break the relationship
-        parameters = {'uid': uid, 'name': team_name}
+        parameters = {'uuid': uuid, 'name': team_name}
         cquery = '''
-        match (u:User {uid: $uid}), (t:Team {name: $name})
+        match (u:User {uuid: $uuid}), (t:Team {name: $name})
         return exists((u)-[:has_attr]-(t)) as is_present
         '''
         status = self.session.run(cquery, parameters=parameters)
@@ -322,7 +323,7 @@ class userAPI:
 
         if not is_present:
             cquery = '''
-            match (u:User {uid: $uid})
+            match (u:User {uuid: $uuid})
             match (t:Team {name: $name})
             merge (u)-[:has_attr]->(t)
             '''
@@ -330,41 +331,41 @@ class userAPI:
         return status
 
 
-    def remove_user_team(self, uid, team_name):
+    def remove_user_team(self, uuid, team_name):
         ''' This method is to remove a user from a team. '''
         # When check if the relationship exist, it always return False
         # If relationship is there it will break the relationship
-        parameters = {'uid': uid, 'name': team_name}
+        parameters = {'uuid': uuid, 'name': team_name}
         cquery = '''
-        match (u:User {uid: $uid}), (t:Team {name: $name})
+        match (u:User {uuid: $uuid}), (t:Team {name: $name})
         return exists((u)-[:has_attr]-(t)) as is_present
         '''
         status = self.session.run(cquery, parameters=parameters)
         is_present = status.single()[0]
         #print(is_present)
 
-        parameters = {'uid': uid, 'name': team_name}
+        parameters = {'uuid': uuid, 'name': team_name}
         cquery = '''
-        match (u:User {uid: $uid})-[r:has_attr]->(t:Team {name: $name})
+        match (u:User {uuid: $uuid})-[r:has_attr]->(t:Team {name: $name})
         delete r
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
 
 
-    def create_MLExchange_asset(self, name='MLExchange Asset'):
+    def create_mlex_asset(self, name='MLExchange Asset'):
         parameters = {'name': name}
         cquery = '''
-        create (ma:MasterAsset:Attribute {name: $name})
+        create (ma:MlexAsset:Attribute {name: $name})
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
 
 
-    def delete_MLExchange_asset(self, name='MLExchange Asset'):
+    def delete_mlex_asset(self, name='MLExchange Asset'):
         parameters = {'name': name}
         cquery = '''
-        match (ma:MasterAsset {name: $name})
+        match (ma:MlexAsset {name: $name})
         detach delete ma
         '''
         status = self.session.run(cquery, parameters=parameters)
@@ -402,29 +403,29 @@ class userAPI:
         return status
 
 
-    def add_user_content_asset(self, user_uid, asset_uid=None, asset_name=None, to_master=False):
+    def add_user_content_asset(self, uuid, asset_uid=None, asset_name=None, to_master=False):
         ''' Add a user to access an asset. '''
         if to_master:
-            parameters = {'asset_name': 'MLExchange Asset', 'user_uid': user_uid}
+            parameters = {'asset_name': 'MLExchange Asset', 'uuid': uuid}
             cquery = '''
             match (ma:MasterAsset {name: $asset_name})
-            match (u:User {uid: $user_uid})
+            match (u:User {uuid: $uuid})
             merge (u)-[:has_attr]->(ma)
             '''
             status = self.session.run(cquery, parameters=parameters)
         
         else:
-            parameters = {'asset_name': asset_name, 'asset_uid': asset_uid, 'user_uid': user_uid}
+            parameters = {'asset_name': asset_name, 'asset_uid': asset_uid, 'uuid': uuid}
             if asset_uid:
                 cquery = '''
                 match (ass:Asset {asset_uid: $asset_uid})
-                match (u:User {uid: $user_uid})
+                match (u:User {uuid: $uuid})
                 merge (u)-[:has_attr]->(ass)
                 '''
             else:
                 cquery = '''
                 match (ass:Asset {asset_name: $asset_name})
-                match (u:User {uid: $user_uid})
+                match (u:User {uuid: $uuid})
                 merge (u)-[:has_attr]->(ass)
                 '''
             status = self.session.run(cquery, parameters=parameters)
@@ -432,25 +433,25 @@ class userAPI:
         return status
 
 
-    def remove_user_content_asset(self, user_uid, asset_uid=None, asset_name=None, from_master=False):
+    def remove_user_content_asset(self, uuid, asset_uid=None, asset_name=None, from_master=False):
         if from_master:
-            parameters = {'asset_name': 'MLExchange Asset', 'user_uid': user_uid}
+            parameters = {'asset_name': 'MLExchange Asset', 'uuid': uuid}
             cquery = '''
-            match (u:User {uid: $user_uid})-[rel:has_attr]->(ma:MasterAsset {name: $asset_name})
+            match (u:User {uuid: $uuid})-[rel:has_attr]->(ma:MasterAsset {name: $asset_name})
             delete rel
             '''
             status = self.session.run(cquery, parameters=parameters)
 
         else:
-            parameters = {'asset_name': asset_name, 'asset_uid': asset_uid, 'user_uid': user_uid}
+            parameters = {'asset_name': asset_name, 'asset_uid': asset_uid, 'uuid': uuid}
             if asset_uid:
                 cquery = '''
-                match (u:User {uid: $user_uid})-[rel:has_attr]->(ass:Asset {asset_uid: $asset_uid})
+                match (u:User {uuid: $uuid})-[rel:has_attr]->(ass:Asset {asset_uid: $asset_uid})
                 delete rel
                 '''
             else:
                 cquery = '''
-                match (u:User {uid: $user_uid})-[rel:has_attr]->(ass:Asset {asset_name: $asset_name})
+                match (u:User {uuid: $uuid})-[rel:has_attr]->(ass:Asset {asset_name: $asset_name})
                 delete rel
                 '''
             status = self.session.run(cquery, parameters=parameters)
@@ -512,5 +513,5 @@ class userAPI:
 
 
 if __name__ == '__main__':
-    api = userAPI(url="bolt://54.173.171.182:7687", auth=("neo4j", "consolidation-taxis-icing"))
+    api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
     api.driver.close()
