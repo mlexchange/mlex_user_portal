@@ -1,4 +1,4 @@
-# MLExchange User Portal API
+# MLExchange User Portal Application
 
 This API manages user-related objects.
 
