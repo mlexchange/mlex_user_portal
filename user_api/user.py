@@ -33,7 +33,7 @@ class userAPI:
         ### For developing purpose
         ### Create default users for testing
         self.delete_default_users()
-        self.add_default_users()
+        self.create_default_users()
 
         ### For developing purpose
         ### Add compute location
@@ -43,7 +43,7 @@ class userAPI:
         ### For developing purpose
         ### Add Team
         #self.remove_team('MLExchange_Team')
-        self.add_team('MLExchange_Team')
+        self.create_team('MLExchange_Team')
         self.assign_user_team(uuid='u_HKrish00003', team_name='MLExchange_Team')
         #self.remove_user_team(uuid='u_HKrish00003', team_name='MLExchange_Team')
 
@@ -53,10 +53,10 @@ class userAPI:
         #self.test_policy2()
         
         ### For developing purpose
-        ### add_user_asset
-        self.add_user_asset(name='Asset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
-        ### Check for blocking of node duplication on add_user_asset.
-        self.add_user_asset(name='Asset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
+        ### create_user_asset
+        self.create_user_asset(name='Asset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
+        ### Check for blocking of node duplication on create_user_asset.
+        self.create_user_asset(name='Asset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
         #self.remove_content_asset(cuid=None, name='Asset_00001')
         
         #['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
@@ -65,6 +65,8 @@ class userAPI:
 
         print(self.get_all_user_uuid())
         print(self.get_all_assets())
+
+        self.archive_user(uuid='u_HKrish00003')
 
         #self.remove_user_content_asset(uuid='u_JSmith00004', from_master=True)
         #self.remove_user_content_asset(uuid='u_HYanxon00001', name='Asset_00001')
@@ -117,7 +119,7 @@ class userAPI:
         return status
        
 
-    def add_user(self, fname, lname, email, role='General User'):
+    def create_user(self, fname, lname, email, role='General User'):
         ''' A function to add user node. Every user is assigned as General User after sign-up. '''
         
         if role not in self.role_count:
@@ -136,9 +138,10 @@ class userAPI:
         match (r:Role {name:$role})
         match (ap:MlexProfile {name: "MLExchange Profile"})
         merge (n:Subject:user:Primitive {uuid: $temp_id})-[:has_attr]->(r)
+        SET n.active = True
         // Create user's profile
         merge (n)-[:owner_of]->(p:UserProfile:Object 
-        {name: $profile_name, uuid: $temp_id, fname: $fname, lname: $lname, email: $email})-[:has_attr]->(ap)
+        {name: $profile_name, uuid: $temp_id, fname: $fname, lname: $lname, email: $email, active:True})-[:has_attr]->(ap)
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
@@ -167,15 +170,15 @@ class userAPI:
         # I'm thinking that user node should only contains uuid.
         # Meanwhile, we can create another node for the user that contains his/her profile. This node is called profile node.
         # Profile will include, but not limited to, first name, last name, email, institution, etc.
-        # I wonder if we need so make this separate from add_user because currently this function is included in add_user
+        # I wonder if we need so make this separate from create_user because currently this function is included in create_user
         status = None
         return status
 
     
     def assign_user_role(self, uuid, role, prev_role=None):
         ''' This method is to assign a user to a role. '''
-        # If the role is already general-user, do nothing
-        if role == 'General-User':
+        # If the role is already general user, do nothing
+        if role == 'General User':
             return None
 
         # If one user is assigned to one role, then:
@@ -204,15 +207,24 @@ class userAPI:
         return status
 
     
-    def delete_user(self, uuid):
+    def archive_user(self, uuid):
+        ''' Remove user from active user database and archive the uuid with its relationships to its owned assets. '''
         # How do one get the uid?
         # we are changing this to archive
         parameters = {'uuid': uuid}
         cquery = '''
-        match (u:user {uuid: $uuid})
-        match (p:UserProfile {uuid: $uuid})
-        detach delete (u)
-        detach delete (p)
+        CALL {
+            MATCH (p:UserProfile {uuid: $uuid})-[rel:has_attr]->()
+            SET p.status = 'Inactive'
+            RETURN rel AS rels
+            UNION ALL
+            MATCH (u:user {uuid: $uuid})-[rel:has_attr]->()
+            SET u.status = 'Inactive'
+            RETURN rel AS rels
+        }
+        
+        WITH rels
+        DELETE rels
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
@@ -226,17 +238,17 @@ class userAPI:
         return status
 
     
-    def add_default_users(self):
-        self.add_user('Howard', 'Yanxon', 'hg.yanxon@gmail.com', 'MLE Admin')
-        self.add_user('Elizabeth', 'Holman', 'liz@gmail.com', 'MLE Admin')
-        self.add_user('Hari', 'Krish', 'krish@gmail.com', 'Admin')
-        self.add_user('John', 'Smith', 'smithj123@gmail.com', 'General User')
+    def create_default_users(self):
+        self.create_user('Howard', 'Yanxon', 'hg.yanxon@gmail.com', 'MLE Admin')
+        self.create_user('Elizabeth', 'Holman', 'liz@gmail.com', 'MLE Admin')
+        self.create_user('Hari', 'Krish', 'krish@gmail.com', 'Admin')
+        self.create_user('John', 'Smith', 'smithj123@gmail.com', 'General User')
 
 
     def delete_default_users(self):
         uuids = ['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
         for uuid in uuids:
-            status = self.delete_user(uuid)
+            status = self.archive_user(uuid)
         return status
 
     
@@ -274,7 +286,7 @@ class userAPI:
         return status
 
 
-    def add_team(self, name):
+    def create_team(self, name):
         cquery = '''
         match (t:Team {name: $name})
         return exists(t.name) as is_present
@@ -379,7 +391,7 @@ class userAPI:
         return status
 
 
-    def add_user_asset(self, name:str, owner:str, type:str, path:str):
+    def create_user_asset(self, name:str, owner:str, type:str, path:str):
         ''' Adds a customizable user asset after checking for existance of duplicates. Transaction-locked query.'''
         parameters = {'name': name, 'owner': owner, 'path': path, 'type': type}
         cquery = '''
@@ -399,19 +411,49 @@ class userAPI:
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
+    
+    def create_content_asset(self, name:str, owner:str, type:str, cuid:str):
+        ''' Registers creation of new assets from content registry. Transaction-locked query.'''
+        parameters = {'name': name, 'owner': owner, 'type': type, 'cuid':cuid}
+        cquery = '''
+        MATCH (ca:content {cuid:$cuid})
+        WITH count(ca) AS counts
 
-    def remove_content_asset(self, cuid=None, name=None):
-        parameters = {'name': name, 'cuid': cuid}
-        if cuid:
+        WITH counts, $cuid AS c_uid
+        CALL apoc.do.when(counts = 0,
+            'CREATE (ca:content:Object:Primitive {cuid:c_uid}) RETURN ca.cuid AS result',
+            '',
+            {counts:counts, c_uid:c_uid}) YIELD value
+
+        WITH value.result as ca_uid
+        MATCH (u:user {uuid: $owner}), (ca:content {cuid:ca_uid})
+        CREATE (u)-[:owner_of]->(ua)
+        SET ca.name = $name, ca.owner = $owner, ca.type = $type
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
+
+    def remove_user_asset(self, uauid=None, name=None, owner=None):
+        parameters = {'name': name, 'uauid': uauid}
+        if uauid:
             cquery = '''
-            match (ca:content {cuid: $cuid})
-            detach delete ca
+            match (ua:UserAsset {uauid: $uauid})
+            detach delete ua
             '''
         else:
             cquery = '''
-            match (ca:content{name: $name})
-            detach delete ca
+            match (ua:UserAsset {name: $name, owner: $owner})
+            detach delete ua
             '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
+    
+    def remove_content_asset(self, cuid=None):
+        parameters = {'cuid': cuid}
+        cquery = '''
+        match (ca:content {cuid: $cuid})
+        detach delete ca
+        '''
         status = self.session.run(cquery, parameters=parameters)
         return status
 
@@ -472,20 +514,27 @@ class userAPI:
         return status
 
 
-    def get_all_user_uuid(self):
+    def get_all_user_uuid(self, active=True):
         ''' Gets all information on all users, including uuids. Used for authentication and by admins. '''
-        cquery = '''
-        match (up:UserProfile)
-        return up.fname as FirstName, up.lname as LastName, up.email as Email, up.uuid as UUID
-        '''
-        status = self.session.run(cquery).data()
+        if active:
+            cquery = '''
+            match (up:UserProfile {active:True})
+            return up.fname as FirstName, up.lname as LastName, up.email as Email, up.uuid as UUID
+            '''
+            status = self.session.run(cquery).data()
+        else:
+            cquery = '''
+            match (up:UserProfile)
+            return up.fname as FirstName, up.lname as LastName, up.email as Email, up.uuid as UUID
+            '''
+            status = self.session.run(cquery).data()
         return status #[s['u'] for s in status]
 
 
     def get_all_user_metadata(self):
-        ''' Gets all information on all users, excluding uuids. Front-facing User DB. '''
+        ''' Gets all information on all active users, excluding uuids. Front-facing User DB. '''
         cquery = '''
-        match (up:UserProfile {uuid:$uuid})
+        match (up:UserProfile {active:True})
         return up.fname as FirstName, up.lname as LastName, up.email as Email
         '''
         status = self.session.run(cquery).data()
