@@ -1,3 +1,5 @@
+import profile
+from readline import get_current_history_length
 from neo4j import GraphDatabase, basic_auth
 
 class userAPI:
@@ -51,16 +53,21 @@ class userAPI:
         #self.test_policy2()
         
         ### For developing purpose
-        ### add_content_asset
-        self.add_content_asset(asset_name='Asset_00001', asset_owner='u_HKrish00003', asset_type='Trained_Model', asset_path='HERE')
-        #self.remove_content_asset(asset_uid=None, asset_name='Asset_00001')
+        ### add_user_asset
+        self.add_user_asset(name='Asset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
+        ### Check for blocking of node duplication on add_user_asset.
+        self.add_user_asset(name='Asset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
+        #self.remove_content_asset(cuid=None, name='Asset_00001')
         
         #['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
-        self.add_user_content_asset(uuid='u_JSmith00004', asset_uid=None, asset_name=None, to_master=True)
-        self.add_user_content_asset(uuid='u_HYanxon00001', asset_name='Asset_00001', to_master=False)
+        self.add_user_to_content_asset(uuid='u_JSmith00004', cuid=None, name=None, to_master=True)
+        self.add_user_to_content_asset(uuid='u_HYanxon00001', name='Asset_00001', to_master=False)
+
+        print(self.get_all_user_uuid())
+        print(self.get_all_assets())
 
         #self.remove_user_content_asset(uuid='u_JSmith00004', from_master=True)
-        #self.remove_user_content_asset(uuid='u_HYanxon00001', asset_name='Asset_00001')
+        #self.remove_user_content_asset(uuid='u_HYanxon00001', name='Asset_00001')
 
 
     def test_policy1(self):
@@ -117,7 +124,7 @@ class userAPI:
             msg = 'The assigned role is not in the system.\nPlease add the intended role to the system.'
             raise ValueError(msg)
         cquery = '''
-        match (u:User) return u
+        match (u:user) return u
         '''
         dbindx = len([dict(_) for _ in self.session.run(cquery)]) + 1
         temp_id = 'u_' + str(fname[0] + lname + str(dbindx).zfill(5))
@@ -128,7 +135,7 @@ class userAPI:
         cquery = '''
         match (r:Role {name:$role})
         match (ap:MlexProfile {name: "MLExchange Profile"})
-        merge (n:Subject:User:Primitive {uuid: $temp_id})-[:has_attr]->(r)
+        merge (n:Subject:user:Primitive {uuid: $temp_id})-[:has_attr]->(r)
         // Create user's profile
         merge (n)-[:owner_of]->(p:UserProfile:Object 
         {name: $profile_name, uuid: $temp_id, fname: $fname, lname: $lname, email: $email})-[:has_attr]->(ap)
@@ -178,19 +185,19 @@ class userAPI:
 
         parameters = {'uuid': uuid, 'rname': role}
         cquery = '''
-        match (u:User {uuid:$uuid}), (r:Role {name:$role})
+        match (u:user {uuid:$uuid}), (r:Role {name:$role})
         merge (u)-[:has_attr]->(r)
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
 
 
-    def delete_user_role(uuid, role):
+    def delete_user_role(self, uuid, role):
         # This function should not need role as an argument.
         # Neo4j should know the role that is attached to the user.
         parameters = {'uuid': uuid, 'role': role}
         cquery = '''
-        match (u:User {uuid: $uuid})-[rel:has_attr]->(r:Role {name:$role})
+        match (u:user {uuid: $uuid})-[rel:has_attr]->(r:Role {name:$role})
         delete rel
         '''
         status = self.session.run(cquery, parameters=parameters)
@@ -202,7 +209,7 @@ class userAPI:
         # we are changing this to archive
         parameters = {'uuid': uuid}
         cquery = '''
-        match (u:User {uuid: $uuid})
+        match (u:user {uuid: $uuid})
         match (p:UserProfile {uuid: $uuid})
         detach delete (u)
         detach delete (p)
@@ -314,7 +321,7 @@ class userAPI:
         # If relationship is there it will break the relationship
         parameters = {'uuid': uuid, 'name': team_name}
         cquery = '''
-        match (u:User {uuid: $uuid}), (t:Team {name: $name})
+        match (u:user {uuid: $uuid}), (t:Team {name: $name})
         return exists((u)-[:has_attr]-(t)) as is_present
         '''
         status = self.session.run(cquery, parameters=parameters)
@@ -323,7 +330,7 @@ class userAPI:
 
         if not is_present:
             cquery = '''
-            match (u:User {uuid: $uuid})
+            match (u:user {uuid: $uuid})
             match (t:Team {name: $name})
             merge (u)-[:has_attr]->(t)
             '''
@@ -337,7 +344,7 @@ class userAPI:
         # If relationship is there it will break the relationship
         parameters = {'uuid': uuid, 'name': team_name}
         cquery = '''
-        match (u:User {uuid: $uuid}), (t:Team {name: $name})
+        match (u:user {uuid: $uuid}), (t:Team {name: $name})
         return exists((u)-[:has_attr]-(t)) as is_present
         '''
         status = self.session.run(cquery, parameters=parameters)
@@ -346,7 +353,7 @@ class userAPI:
 
         parameters = {'uuid': uuid, 'name': team_name}
         cquery = '''
-        match (u:User {uuid: $uuid})-[r:has_attr]->(t:Team {name: $name})
+        match (u:user {uuid: $uuid})-[r:has_attr]->(t:Team {name: $name})
         delete r
         '''
         status = self.session.run(cquery, parameters=parameters)
@@ -372,60 +379,66 @@ class userAPI:
         return status
 
 
-    def add_content_asset(self, asset_name, asset_owner, asset_type, asset_path):
-        # Set up asset node
-        asset_uid = 'a' + asset_owner[1:] + '_'
-        parameters = {'asset_name': asset_name, 'auid': asset_uid, 'asset_owner': asset_owner, 'asset_path': asset_path, 'asset_type': asset_type}
+    def add_user_asset(self, name:str, owner:str, type:str, path:str):
+        ''' Adds a customizable user asset after checking for existance of duplicates. Transaction-locked query.'''
+        parameters = {'name': name, 'owner': owner, 'path': path, 'type': type}
         cquery = '''
-        match (u:User {uid: $asset_owner})
-        match (ma:MasterAsset {name: "MLExchange Asset"})
-        create (ass:Asset:Object:Primitive 
-        {asset_name: $asset_name, asset_uid: toString(($auid)+toString(timestamp())), asset_owner: $asset_owner, asset_path: $asset_path,asset_type: $asset_type})
-        merge (u)-[:owner_of]->(ass)-[:has_attr]->(ma)
+        MATCH (ua:UserAsset {name:$name, owner:$owner, path:$path, type:$type})
+        WITH count(ua) AS counts
+
+        WITH counts
+        CALL apoc.do.when(counts = 0,
+            'CREATE (ua:UserAsset:Object:Primitive {uauid: toString((name)+toString(timestamp()))}) RETURN ua.uauid AS result',
+            '',
+            {counts:counts, name:$name}) YIELD value
+
+        WITH value.result as ua_uid
+        MATCH (u:user {uuid: $owner}), (ua:UserAsset {uauid:ua_uid})
+        CREATE (u)-[:owner_of]->(ua)
+        SET ua.name = $name, ua.owner = $owner, ua.path = $path, ua.type = $type
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
 
-
-    def remove_content_asset(self, asset_uid=None, asset_name=None):
-        parameters = {'asset_name': asset_name, 'asset_uid': asset_uid}
-        if asset_uid:
+    def remove_content_asset(self, cuid=None, name=None):
+        parameters = {'name': name, 'cuid': cuid}
+        if cuid:
             cquery = '''
-            match (ass:Asset {asset_uid: $asset_uid})
-            detach delete ass
+            match (ca:content {cuid: $cuid})
+            detach delete ca
             '''
         else:
             cquery = '''
-            match (ass:Asset {asset_name: $asset_name})
-            detach delete ass
+            match (ca:content{name: $name})
+            detach delete ca
             '''
         status = self.session.run(cquery, parameters=parameters)
         return status
 
 
-    def add_user_content_asset(self, uuid, asset_uid=None, asset_name=None, to_master=False):
-        ''' Add a user to access an asset. '''
+    def add_user_to_content_asset(self, uuid, cuid=None, name=None, to_master=False):
+        ''' Add a user to access a content registry asset. '''
         if to_master:
-            parameters = {'asset_name': 'MLExchange Asset', 'uuid': uuid}
+            parameters = {'name': 'MLExchange Asset', 'uuid': uuid}
             cquery = '''
-            match (ma:MasterAsset {name: $asset_name})
-            match (u:User {uuid: $uuid})
+            match (ma:MasterAsset {name: $name})
+            match (u:user {uuid: $uuid})
             merge (u)-[:has_attr]->(ma)
             '''
             status = self.session.run(cquery, parameters=parameters)
         
         else:
-            parameters = {'asset_name': asset_name, 'asset_uid': asset_uid, 'uuid': uuid}
-            if asset_uid:
+            parameters = {'name': name, 'cuid': cuid, 'uuid': uuid}
+            if cuid:
                 cquery = '''
-                match (ass:Asset {asset_uid: $asset_uid})
-                match (u:User {uuid: $uuid})
+                match (ca:content {cuid: $cuid})
+                match (u:user {uuid: $uuid})
                 merge (u)-[:has_attr]->(ass)
                 '''
             else:
                 cquery = '''
-                match (ass:Asset {asset_name: $asset_name})
-                match (u:User {uuid: $uuid})
+                match (ass:Asset {name: $name})
+                match (u:user {uuid: $uuid})
                 merge (u)-[:has_attr]->(ass)
                 '''
             status = self.session.run(cquery, parameters=parameters)
@@ -433,25 +446,25 @@ class userAPI:
         return status
 
 
-    def remove_user_content_asset(self, uuid, asset_uid=None, asset_name=None, from_master=False):
+    def remove_user_from_content_asset(self, uuid, cuid=None, name=None, from_master=False):
         if from_master:
-            parameters = {'asset_name': 'MLExchange Asset', 'uuid': uuid}
+            parameters = {'name': 'MLExchange Asset', 'uuid': uuid}
             cquery = '''
-            match (u:User {uuid: $uuid})-[rel:has_attr]->(ma:MasterAsset {name: $asset_name})
+            match (u:user {uuid: $uuid})-[rel:has_attr]->(ma:MasterAsset {name: $name})
             delete rel
             '''
             status = self.session.run(cquery, parameters=parameters)
 
         else:
-            parameters = {'asset_name': asset_name, 'asset_uid': asset_uid, 'uuid': uuid}
-            if asset_uid:
+            parameters = {'name': name, 'cuid': cuid, 'uuid': uuid}
+            if cuid:
                 cquery = '''
-                match (u:User {uuid: $uuid})-[rel:has_attr]->(ass:Asset {asset_uid: $asset_uid})
+                match (u:user {uuid: $uuid})-[rel:has_attr]->(ass:Asset {cuid: $cuid})
                 delete rel
                 '''
             else:
                 cquery = '''
-                match (u:User {uuid: $uuid})-[rel:has_attr]->(ass:Asset {asset_name: $asset_name})
+                match (u:user {uuid: $uuid})-[rel:has_attr]->(ass:Asset {name: $name})
                 delete rel
                 '''
             status = self.session.run(cquery, parameters=parameters)
@@ -459,27 +472,36 @@ class userAPI:
         return status
 
 
-    def get_all_users(self):
+    def get_all_user_uuid(self):
+        ''' Gets all information on all users, including uuids. Used for authentication and by admins. '''
         cquery = '''
-        match (u:User)
-        return u
+        match (up:UserProfile)
+        return up.fname as FirstName, up.lname as LastName, up.email as Email, up.uuid as UUID
         '''
         status = self.session.run(cquery).data()
-        return [s['u'] for s in status]
+        return status #[s['u'] for s in status]
 
 
-    def get_user_profile(self):
-        ''' '''
-        return user_profile_node
+    def get_all_user_metadata(self):
+        ''' Gets all information on all users, excluding uuids. Front-facing User DB. '''
+        cquery = '''
+        match (up:UserProfile {uuid:$uuid})
+        return up.fname as FirstName, up.lname as LastName, up.email as Email
+        '''
+        status = self.session.run(cquery).data()
+        return status
 
     
     def get_all_assets(self):
         cquery = '''
-        match (ass:Asset)
-        return ass
+        MATCH (ca:content)
+        RETURN ca AS asset
+        UNION ALL
+        MATCH (ua:UserAsset)
+        RETURN ua AS asset
         '''
         status = self.session.run(cquery).data()
-        return [s['ass'] for s in status]
+        return status
 
 
     def get_all_roles(self):
