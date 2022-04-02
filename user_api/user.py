@@ -18,14 +18,6 @@ class userAPI:
         # Initiate all roles
         for r in self.role_count.keys():
             status = self.create_role(r)
-        
-        ### For developing purpose. Delete MLExchange_Profile
-        self.delete_mlex_profile()
-        self.delete_mlex_asset()
-
-        # Create MLExchange Profile and MLExchange Asset
-        self.create_mlex_profile()
-        self.create_mlex_asset()
 
         # Initiate action: full access, read, write
         self.create_action()
@@ -37,15 +29,15 @@ class userAPI:
 
         ### For developing purpose
         ### Add compute location
-        self.delete_compute_resource(cuid='c_MLSandbox00001')
-        self.add_compute_resource(name='MLSandbox', location='Lawrence Berkeley National Laboratory', profile=None)
+        self.delete_compute_location(cluid='c_MLSandbox00001')
+        self.create_compute_location(name='MLSandbox', location='Lawrence Berkeley National Laboratory')
 
         ### For developing purpose
         ### Add Team
-        #self.remove_team('MLExchange_Team')
-        self.create_team('MLExchange_Team')
-        self.assign_user_team(uuid='u_HKrish00003', team_name='MLExchange_Team')
-        #self.remove_user_team(uuid='u_HKrish00003', team_name='MLExchange_Team')
+        #self.delete_team(name='MLExchange_Team', owner='u_EHolman00002')
+        self.create_team(name='MLExchange_Team', owner='u_EHolman00002')
+        self.add_user_team(uuid='u_HKrish00003', team_name='MLExchange_Team', team_owner='u_EHolman00002')
+        #self.remove_user_team(uuid='u_HKrish00003', team_name='MLExchange_Team', team_owner='u_EHolman00002')
 
         ### For developing purpose
         ### Add a test policy
@@ -60,13 +52,8 @@ class userAPI:
         #self.remove_content_asset(cuid=None, name='Asset_00001')
         
         #['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
-        self.add_user_to_content_asset(uuid='u_JSmith00004', cuid=None, name=None, to_master=True)
-        self.add_user_to_content_asset(uuid='u_HYanxon00001', name='Asset_00001', to_master=False)
 
-        print(self.get_all_user_uuid())
-        print(self.get_all_assets())
-
-        self.archive_user(uuid='u_HKrish00003')
+        #self.archive_user(uuid='u_HKrish00003')
 
         #self.remove_user_content_asset(uuid='u_JSmith00004', from_master=True)
         #self.remove_user_content_asset(uuid='u_HYanxon00001', name='Asset_00001')
@@ -94,20 +81,13 @@ class userAPI:
 
 
     def create_role(self, role):
+        """ Admin Use Only. """
         parameters = {'role': role}
         cquery = '''
-        create (r:Role:Attribute {name:$role})
+        MERGE (r:Role:Attribute {name:$role})
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
-
-
-    def add_role(self, role):
-        if role not in self.role_count:
-            self.role_count[role] = 0
-        status = self.create_role(role)
-        return status
-
 
     def delete_role(self, role):
         parameters = {'role': role}
@@ -117,7 +97,6 @@ class userAPI:
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
-       
 
     def create_user(self, fname, lname, email, role='General User'):
         ''' A function to add user node. Every user is assigned as General User after sign-up. '''
@@ -132,46 +111,15 @@ class userAPI:
         temp_id = 'u_' + str(fname[0] + lname + str(dbindx).zfill(5))
         
         profile_name = fname+'\'s Profile'
-        parameters = {'temp_id': temp_id, 'fname': fname, 'lname': lname, 'email': email, 'role': role, 'profile_name': profile_name}
         
+        parameters = {'temp_id': temp_id, 'fname': fname, 'lname': lname, 'email': email, 'role': role, 'profile_name': profile_name}
         cquery = '''
         match (r:Role {name:$role})
-        match (ap:MlexProfile {name: "MLExchange Profile"})
-        merge (n:Subject:user:Primitive {uuid: $temp_id})-[:has_attr]->(r)
-        SET n.active = True
-        // Create user's profile
-        merge (n)-[:owner_of]->(p:UserProfile:Object 
-        {name: $profile_name, uuid: $temp_id, fname: $fname, lname: $lname, email: $email, active:True})-[:has_attr]->(ap)
+        merge (up:UserProfile:Object 
+        {name: $profile_name, uuid: $temp_id, fname: $fname, lname: $lname, email: $email, active:True})<-[:owner_of]-(u:Subject:user:Primitive {uuid: $temp_id})-[:has_attr]->(r)
+        SET u.active = True
         '''
         status = self.session.run(cquery, parameters=parameters)
-        return status
-
-    
-    def create_mlex_profile(self, name='MLExchange Profile'):
-        parameters = {'name': name}
-        cquery = '''
-        create (ap:MlexProfile:Attribute {name: $name})
-        '''
-        status = self.session.run(cquery, parameters=parameters)
-        return status
-
-
-    def delete_mlex_profile(self, name='MLExchange Profile'):
-        parameters = {'name': name}
-        cquery = '''
-        match (ap:MlexProfile {name: $name})
-        detach delete ap
-        '''
-        status = self.session.run(cquery, parameters=parameters)
-        return status
-
-
-    def create_user_profile(self):
-        # I'm thinking that user node should only contains uuid.
-        # Meanwhile, we can create another node for the user that contains his/her profile. This node is called profile node.
-        # Profile will include, but not limited to, first name, last name, email, institution, etc.
-        # I wonder if we need so make this separate from create_user because currently this function is included in create_user
-        status = None
         return status
 
     
@@ -215,11 +163,11 @@ class userAPI:
         cquery = '''
         CALL {
             MATCH (p:UserProfile {uuid: $uuid})-[rel:has_attr]->()
-            SET p.status = 'Inactive'
+            SET p.active = False
             RETURN rel AS rels
             UNION ALL
             MATCH (u:user {uuid: $uuid})-[rel:has_attr]->()
-            SET u.status = 'Inactive'
+            SET u.active = False
             RETURN rel AS rels
         }
         
@@ -252,144 +200,107 @@ class userAPI:
         return status
 
     
-    def add_compute_resource(self, name, location, profile=None):
+    def create_compute_location(self, name, location):
         """
-        We need to work on the profile argument. Essentially, profile contain ngpu, ncpu, etc. Then,
-        we need to pass this information to the computing resource profile.
+        Create a compute location node. For admins only.
         """
+        parameters = {'name': name, 'location': location}
         cquery = '''
-        match (cr:ComputeResource) return cr
-        '''
-        dbindx = len([dict(_) for _ in self.session.run(cquery)]) + 1
-        cuid = 'c_' + name + str(dbindx).zfill(5)
-        profile_name = name + '\'s Profile'
+        MATCH (cl:ComputeLoc {name:$name, location:$location})
+        WITH count(cl) AS counts
 
-        parameters = {'name': name, 'location': location, 'cuid': cuid, 'profile_name': profile_name, 'profile': 'None'}
-        cquery = '''
-        match (ap:MasterProfile {name: "MLExchange Profile"})
-        create (cr:ComputeResource:Object:Primitive {name: $name, cuid: $cuid})
-        merge (cr)-[:owner_of]->(cp:ComputeResourceProfile:Object {cuid: $cuid, profile_name: $profile_name, location: $location, profile: $profile})-[:has_attr]->(ap)
+        WITH counts, $name AS cl_name, $location AS cl_location
+        CALL apoc.do.when(counts > 0,
+            '',
+            'CREATE (cl:ComputeLoc:Attribute {name:cl_name, location:cl_location, cluid:toString((cl_name)+toString(timestamp()))}) RETURN cl.cluid',
+            {counts:counts, cl_name:cl_name, cl_location:cl_location}) YIELD value
+        WITH value.result as cl_uid
+        MATCH (cl:ComputeLoc {cluid:cl_uid})
+        RETURN cl
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
 
 
-    def delete_compute_resource(self, cuid):
-        parameters = {'cuid': cuid}
+    def delete_compute_location(self, cluid):
+        parameters = {'cluid': cluid}
         cquery = '''
-        match (c:ComputeResource {cuid: $cuid})
-        match (cp:ComputeResourceProfile {cuid: $cuid})
-        detach delete (c)
-        detach delete (cp)
+        match (cl:ComputeLoc {cluid: $cluid})
+        detach delete (cl)
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
 
 
-    def create_team(self, name):
+    def create_team(self, name:str, owner:str):
+        parameters={'name':name, 'owner':owner} 
         cquery = '''
-        match (t:Team {name: $name})
+        match (t:Team {name: $name, owner: $owner})
         return exists(t.name) as is_present
         '''
-        status = self.session.run(cquery, parameters={'name': name})
+        status = self.session.run(cquery, parameters=parameters)
         is_present = False
         for s in status: is_present = s['is_present']
         
         if is_present:
-            msg = 'The team name is already existed.'
+            msg = 'The team name already exists.'
             raise ValueError(msg)
 
         cquery = '''
-        create (t:Team:Attribute {name: $name})
+        match (u:user {uuid:$owner})
+        merge (u)-[:owner_of]->(t:Team:Attribute:Group {name: $name, owner: $owner})
         '''
-        status = self.session.run(cquery, parameters={'name': name})
+        status = self.session.run(cquery, parameters=parameters)
         return status
 
 
-    def remove_team(self, name):
+    def delete_team(self, name:str, owner:str):
+        ''' Delete team. Only owner or admin access.'''
+        parameters={'name':name, 'owner':owner} 
         cquery = '''
-        match (t:Team {name: $name})
+        match (t:Team {name:$name, owner:$owner})
         return exists(t.name) as is_present
         '''
-        status = self.session.run(cquery, parameters={'name': name})
+        status = self.session.run(cquery, parameters=parameters)
         is_present = False
         for s in status: is_present = s['is_present']
         
         if not is_present:
-            msg = 'The team name doesn\'t exist.'
+            msg = 'The team name does not exist.'
             raise ValueError(msg)
 
         cquery = '''
-        match (t:Team {name: $name})
+        match (t:Team {name:$name, owner:$owner})
         detach delete t
         '''
-        status = self.session.run(cquery, parameters={'name': name})
+        status = self.session.run(cquery, parameters=parameters)
         return status
 
 
-    def assign_user_team(self, uuid, team_name):
+    def add_user_team(self, uuid:str, team_name:str, team_owner:str):
         ''' This method is to assign a user to a team. '''
-        # When check if the relationship exist, it always return False
+        # When check if the relationship 
+        # exist, it always return False
         # If relationship is there it will break the relationship
-        parameters = {'uuid': uuid, 'name': team_name}
+        parameters = {'uuid': uuid, 'name': team_name, 'owner':team_owner}
         cquery = '''
-        match (u:user {uuid: $uuid}), (t:Team {name: $name})
-        return exists((u)-[:has_attr]-(t)) as is_present
+        MATCH (u:user {uuid: $uuid}), (t:Team {name:$name, owner:$owner})
+        MERGE (u)-[:has_attr]->(t)
         '''
         status = self.session.run(cquery, parameters=parameters)
-        is_present = status.single()[0]
-        #print(is_present)
-
-        if not is_present:
-            cquery = '''
-            match (u:user {uuid: $uuid})
-            match (t:Team {name: $name})
-            merge (u)-[:has_attr]->(t)
-            '''
-            status = self.session.run(cquery, parameters=parameters)
         return status
 
-
-    def remove_user_team(self, uuid, team_name):
+    def remove_user_team(self, uuid:str, team_name:str, team_owner:str):
         ''' This method is to remove a user from a team. '''
         # When check if the relationship exist, it always return False
         # If relationship is there it will break the relationship
-        parameters = {'uuid': uuid, 'name': team_name}
+        parameters = {'uuid': uuid, 'name': team_name, 'owner':team_owner}
         cquery = '''
-        match (u:user {uuid: $uuid}), (t:Team {name: $name})
-        return exists((u)-[:has_attr]-(t)) as is_present
-        '''
-        status = self.session.run(cquery, parameters=parameters)
-        is_present = status.single()[0]
-        #print(is_present)
-
-        parameters = {'uuid': uuid, 'name': team_name}
-        cquery = '''
-        match (u:user {uuid: $uuid})-[r:has_attr]->(t:Team {name: $name})
-        delete r
+        MATCH (u:user {uuid: $uuid})-[rel:has_attr]->(t:Team {name:$name, owner:$owner})
+        DELETE rel
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
-
-
-    def create_mlex_asset(self, name='MLExchange Asset'):
-        parameters = {'name': name}
-        cquery = '''
-        create (ma:MlexAsset:Attribute {name: $name})
-        '''
-        status = self.session.run(cquery, parameters=parameters)
-        return status
-
-
-    def delete_mlex_asset(self, name='MLExchange Asset'):
-        parameters = {'name': name}
-        cquery = '''
-        match (ma:MlexAsset {name: $name})
-        detach delete ma
-        '''
-        status = self.session.run(cquery, parameters=parameters)
-        return status
-
 
     def create_user_asset(self, name:str, owner:str, type:str, path:str):
         ''' Adds a customizable user asset after checking for existance of duplicates. Transaction-locked query.'''
@@ -412,123 +323,84 @@ class userAPI:
         status = self.session.run(cquery, parameters=parameters)
         return status
     
-    def create_content_asset(self, name:str, owner:str, type:str, cuid:str):
+    def create_content_asset(self, name:str, owner:str, type:str, cuid:str, public=False):
         ''' Registers creation of new assets from content registry. Transaction-locked query.'''
-        parameters = {'name': name, 'owner': owner, 'type': type, 'cuid':cuid}
-        cquery = '''
-        MATCH (ca:content {cuid:$cuid})
-        WITH count(ca) AS counts
-
-        WITH counts, $cuid AS c_uid
-        CALL apoc.do.when(counts = 0,
-            'CREATE (ca:content:Object:Primitive {cuid:c_uid}) RETURN ca.cuid AS result',
-            '',
-            {counts:counts, c_uid:c_uid}) YIELD value
-
-        WITH value.result as ca_uid
-        MATCH (u:user {uuid: $owner}), (ca:content {cuid:ca_uid})
-        CREATE (u)-[:owner_of]->(ua)
-        SET ca.name = $name, ca.owner = $owner, ca.type = $type
-        '''
-        status = self.session.run(cquery, parameters=parameters)
-        return status
-
-    def remove_user_asset(self, uauid=None, name=None, owner=None):
-        parameters = {'name': name, 'uauid': uauid}
-        if uauid:
+        if public:
+            parameters = {'name': name, 'owner': owner, 'type': type, 'cuid':cuid}
             cquery = '''
-            match (ua:UserAsset {uauid: $uauid})
-            detach delete ua
-            '''
-        else:
-            cquery = '''
-            match (ua:UserAsset {name: $name, owner: $owner})
-            detach delete ua
-            '''
-        status = self.session.run(cquery, parameters=parameters)
-        return status
-    
-    def remove_content_asset(self, cuid=None):
-        parameters = {'cuid': cuid}
-        cquery = '''
-        match (ca:content {cuid: $cuid})
-        detach delete ca
-        '''
-        status = self.session.run(cquery, parameters=parameters)
-        return status
+            MATCH (ca:content {cuid:$cuid})
+            WITH count(ca) AS counts
 
+            WITH counts, $cuid AS c_uid
+            CALL apoc.do.when(counts = 0,
+                'CREATE (ca:content:Object:Primitive {cuid:c_uid}) RETURN ca.cuid AS result',
+                '',
+                {counts:counts, c_uid:c_uid}) YIELD value
 
-    def add_user_to_content_asset(self, uuid, cuid=None, name=None, to_master=False):
-        ''' Add a user to access a content registry asset. '''
-        if to_master:
-            parameters = {'name': 'MLExchange Asset', 'uuid': uuid}
-            cquery = '''
-            match (ma:MasterAsset {name: $name})
-            match (u:user {uuid: $uuid})
-            merge (u)-[:has_attr]->(ma)
+            WITH value.result as ca_uid
+            MATCH (u:user {uuid: $owner}), (ca:content {cuid:ca_uid})
+            CREATE (u)-[:owner_of]->(ca)
+            SET ca.name = $name, ca.owner = $owner, ca.type = $type, ca.public = True
+            RETURN ca.cuid
             '''
             status = self.session.run(cquery, parameters=parameters)
         
         else:
-            parameters = {'name': name, 'cuid': cuid, 'uuid': uuid}
-            if cuid:
-                cquery = '''
-                match (ca:content {cuid: $cuid})
-                match (u:user {uuid: $uuid})
-                merge (u)-[:has_attr]->(ass)
-                '''
-            else:
-                cquery = '''
-                match (ass:Asset {name: $name})
-                match (u:user {uuid: $uuid})
-                merge (u)-[:has_attr]->(ass)
-                '''
-            status = self.session.run(cquery, parameters=parameters)
-
-        return status
-
-
-    def remove_user_from_content_asset(self, uuid, cuid=None, name=None, from_master=False):
-        if from_master:
-            parameters = {'name': 'MLExchange Asset', 'uuid': uuid}
+            parameters = {'name': name, 'owner': owner, 'type': type, 'cuid':cuid}
             cquery = '''
-            match (u:user {uuid: $uuid})-[rel:has_attr]->(ma:MasterAsset {name: $name})
-            delete rel
+            MATCH (ca:content {cuid:$cuid})
+            WITH count(ca) AS counts
+
+            WITH counts, $cuid AS c_uid
+            CALL apoc.do.when(counts = 0,
+                'CREATE (ca:content:Object:Primitive {cuid:c_uid}) RETURN ca.cuid AS result',
+                '',
+                {counts:counts, c_uid:c_uid}) YIELD value
+
+            WITH value.result as ca_uid
+            MATCH (u:user {uuid: $owner}), (ca:content {cuid:ca_uid})
+            CREATE (u)-[:owner_of]->(ca)<-[:has_attr]
+            SET ca.name = $name, ca.owner = $owner, ca.type = $type, ca.public = False
             '''
             status = self.session.run(cquery, parameters=parameters)
-
-        else:
-            parameters = {'name': name, 'cuid': cuid, 'uuid': uuid}
-            if cuid:
-                cquery = '''
-                match (u:user {uuid: $uuid})-[rel:has_attr]->(ass:Asset {cuid: $cuid})
-                delete rel
-                '''
-            else:
-                cquery = '''
-                match (u:user {uuid: $uuid})-[rel:has_attr]->(ass:Asset {name: $name})
-                delete rel
-                '''
-            status = self.session.run(cquery, parameters=parameters)
-
         return status
 
+    def delete_user_asset(self, uauid=None, owner=None):
+        ''' Deletes user asset from graph database. Function for owner. '''
+        parameters = {'owner': owner, 'uauid': uauid}
+        cquery = '''
+        MATCH (ua:UserAsset {owner:$owner, uauid:$uauid})
+        DETACH DELETE ua
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
+    
+    def delete_content_asset(self, owner:str, cuid=None):
+        ''' Deletes content asset from graph database. Function for Compute API and owner. '''
+        if cuid:
+            parameters = {'owner':owner, 'cuid':cuid}
+            cquery = '''
+            MATCH (ca:content {owner:$owner, cuid:$cuid})
+            DETACH DELETE ca
+            '''
+            status = self.session.run(cquery, parameters=parameters)
+        return status
 
     def get_all_user_uuid(self, active=True):
-        ''' Gets all information on all users, including uuids. Used for authentication and by admins. '''
+        ''' Gets all information on all users (default: active), including uuids. Used for authentication and by admins. '''
         if active:
             cquery = '''
             match (up:UserProfile {active:True})
-            return up.fname as FirstName, up.lname as LastName, up.email as Email, up.uuid as UUID
+            return up
             '''
             status = self.session.run(cquery).data()
         else:
             cquery = '''
             match (up:UserProfile)
-            return up.fname as FirstName, up.lname as LastName, up.email as Email, up.uuid as UUID
+            return up
             '''
             status = self.session.run(cquery).data()
-        return status #[s['u'] for s in status]
+        return [s['up'] for s in status]
 
 
     def get_all_user_metadata(self):
@@ -550,7 +422,7 @@ class userAPI:
         RETURN ua AS asset
         '''
         status = self.session.run(cquery).data()
-        return status
+        return [s['asset'] for s in status]
 
 
     def get_all_roles(self):
