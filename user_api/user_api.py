@@ -180,9 +180,5 @@ def get_all_teams():
     teams = api.get_all_teams()
     return teams
 
-
-
-
-
 if __name__ == '__main__':
-    uvicorn.run("main:app", reload=True, port=5000)
+    uvicorn.run("user_api:app", reload=True, port=5000)
