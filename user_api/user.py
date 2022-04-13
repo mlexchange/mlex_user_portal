@@ -496,7 +496,7 @@ class userAPI:
         status = self.session.run(cquery).data()
         return [s['t'] for s in status]
 
-    def get_all_users(self, key_value=None):
+    def get_users(self, key_value=None):
         ''' This method will get all users including their profiles.
             The key will filter out irrelevant users.
             e.g. key = {'fname': 'Noah'} will return all users with Noah as their first name. '''
@@ -650,11 +650,11 @@ if __name__ == '__main__':
     #   results = api.session.run(cypher_query, SmithWriteplaceholdcuid=SmithWriteplaceholdcuid).data()
     #   print(results)
 
-    users = api.get_all_users({'fname': 'Howard', 'lname': 'Yanxon'})
+    users = api.get_users({'fname': 'Howard', 'lname': 'Yanxon'})
     for user in users:
         print(user)
 
-    users = api.get_all_users({'email': 'smithj123@gmail.com'})
+    users = api.get_users({'email': 'smithj123@gmail.com'})
     for user in users:
         print(user)
 
