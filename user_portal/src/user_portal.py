@@ -1,13 +1,15 @@
 # This is where we put the front end code
-import dash
+# import dash
+# import dash_html_components as html
+# import dash_core_components as dcc
+# import dash_table
+
+from dash import Dash, callback, html, dcc, dash_table, Input, Output, State, MATCH, ALL
 import dash_bootstrap_components as dbc
-import dash_html_components as html
-import dash_core_components as dcc
-import dash_table
 
 external_stylesheets = [dbc.themes.BOOTSTRAP, "../assets/segmentation-style.css",]  # need to use bootstrap themes
 
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app = Dash(__name__, external_stylesheets=external_stylesheets)
 
 #--------------------------------------- App Layout ---------------------------------header= dbc.Navbar(
 header = dbc.Navbar(    

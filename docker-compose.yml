@@ -5,12 +5,10 @@ services:
     restart: "unless-stopped"
     container_name: "user-portal"
     build:
-      context: 'front/'
+      context: 'user_portal/'
       dockerfile: 'docker/Dockerfile'
     command: 'python src/user_portal.py'
-    environment:
-      DATA_DIR: "${PWD}/data/"          # Wht is this?
     volumes:
-      - "./front/src:/app/work/src"
+      - "./user_portal/src:/app/work/src"
     ports:
       - '8050:8050'                     # Do we need to change the port?
