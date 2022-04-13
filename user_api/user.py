@@ -1,5 +1,5 @@
 from readline import get_current_history_length
-from typing_extensions import Self
+#from typing_extensions import Self
 from unittest import result
 
 from numpy import column_stack
@@ -496,6 +496,37 @@ class userAPI:
         status = self.session.run(cquery).data()
         return [s['t'] for s in status]
 
+    def get_all_users(self, key_value=None):
+        ''' This method will get all users including their profiles.
+            The key will filter out irrelevant users.
+            e.g. key = {'fname': 'Noah'} will return all users with Noah as their first name. '''
+        cquery = '''
+        match (up:UserProfile)
+        return up
+        '''
+        status = self.session.run(cquery).data()
+
+        # get active users
+        users = []
+        for s in status:
+            if s['up']['active']: users.append(s['up'])
+        
+        # Filter users based on the key_value filter
+        if key_value:
+            users_filter = []
+            for user in users:
+                truth = True
+                for k, v in key_value.items():
+                    if user[k] != v: 
+                        truth = False
+                        break
+                
+                if truth: users_filter.append(user)
+            
+            return users_filter
+
+        else:
+            return users
 
     # Make policies
     def test_policy1(self):
@@ -530,96 +561,102 @@ class userAPI:
 
 
 if __name__ == '__main__':
-    api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
-    
+    api = userAPI(url="bolt://44.201.1.101:7687", auth=("neo4j", "fans-hope-request"))
+
     ### For development purposes: creating sample db ###
     # Create neo4j AUTH DB roles
-    api.create_role('Admin')
-    api.create_role('MLE Admin')
-    api.create_role('MLE User')
-    api.create_role('General User')
+    #   api.create_role('Admin')
+    #   api.create_role('MLE Admin')
+    #   api.create_role('MLE User')
+    #   api.create_role('General User')
 
-    # Create actions
-    def create_action():
-        cquery = '''
-        merge (read:Action {name:'Read'})-[:has_attr]->(fullAccess:Attribute:Group {name:"Full Access"})<-[:has_attr]-(write:Action {name:'Write'})
-        '''
-        api.session.run(cquery)
+    #   # Create actions
+    #   def create_action():
+    #       cquery = '''
+    #       merge (read:Action {name:'Read'})-[:has_attr]->(fullAccess:Attribute:Group {name:"Full Access"})<-[:has_attr]-(write:Action {name:'Write'})
+    #       '''
+    #       api.session.run(cquery)
 
-    create_action()
+    #   create_action()
 
-    # Create users and assign roles
-    api.create_user('Howard', 'Yanxon', 'hg.yanxon@gmail.com', 'orcid')
-    api.add_user_to_role('u_HYanxon00001','MLE Admin')
-    api.create_user('Elizabeth', 'Holman', 'liz@gmail.com', 'orcid')
-    api.add_user_to_role('u_EHolman00002','MLE Admin')
-    api.create_user('Hari', 'Krish', 'krish@gmail.com', 'orcid')
-    api.add_user_to_role('u_HKrish00003','Admin')
-    api.create_user('John', 'Smith', 'smithj123@gmail.com', 'orcid')
+    #   # Create users and assign roles
+    #   api.create_user('Howard', 'Yanxon', 'hg.yanxon@gmail.com', 'orcid')
+    #   api.add_user_to_role('u_HYanxon00001','MLE Admin')
+    #   api.create_user('Elizabeth', 'Holman', 'liz@gmail.com', 'orcid')
+    #   api.add_user_to_role('u_EHolman00002','MLE Admin')
+    #   api.create_user('Hari', 'Krish', 'krish@gmail.com', 'orcid')
+    #   api.add_user_to_role('u_HKrish00003','Admin')
+    #   api.create_user('John', 'Smith', 'smithj123@gmail.com', 'orcid')
 
-    # Add compute location
-    api.delete_compute(name='Aardvark', hostname='aardvark.anl.gov')
-    api.create_compute(name='MLSandbox', hostname='mlsandbox.als.lbl.gov')
-    api.add_user_to_compute(uuid='u_EHolman00002', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
-    api.add_user_to_compute(uuid='u_JSmith00004', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
-    api.remove_user_from_compute(uuid='u_EHolman00002', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
+    #   # Add compute location
+    #   api.delete_compute(name='Aardvark', hostname='aardvark.anl.gov')
+    #   api.create_compute(name='MLSandbox', hostname='mlsandbox.als.lbl.gov')
+    #   api.add_user_to_compute(uuid='u_EHolman00002', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
+    #   api.add_user_to_compute(uuid='u_JSmith00004', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
+    #   api.remove_user_from_compute(uuid='u_EHolman00002', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
 
-    # Add Team
-    api.delete_team(name='MLExchange_Team', owner='u_EHolman00002')
-    api.create_team(name='MLExchange_Team', owner='u_EHolman00002')
-    api.add_user_to_team(uuid='u_HKrish00003', tname='MLExchange_Team', towner='u_EHolman00002')
-    api.remove_user_from_team(uuid='u_HKrish00003', tname='MLExchange_Team', towner='u_EHolman00002')
+    #   # Add Team
+    #   api.delete_team(name='MLExchange_Team', owner='u_EHolman00002')
+    #   api.create_team(name='MLExchange_Team', owner='u_EHolman00002')
+    #   api.add_user_to_team(uuid='u_HKrish00003', tname='MLExchange_Team', towner='u_EHolman00002')
+    #   api.remove_user_from_team(uuid='u_HKrish00003', tname='MLExchange_Team', towner='u_EHolman00002')
 
-    # Create content assets
-    api.create_content_asset(name='CAsset_00001', owner='u_HKrish00003', type='Trained_Model', cuid='placeholdcuid')
-    api.delete_content_asset(cuid='2343462')
-    api.create_content_asset(name='CAsset_00001', owner='u_HKrish00003', type='Trained_Model', cuid='placeholdcuid')
-    api.delete_content_asset(cuid='placeholdcuid')
-    api.create_content_asset(name='CAsset_00001', owner='u_HKrish00003', type='Trained_Model', cuid='placeholdcuid')
+    #   # Create content assets
+    #   api.create_content_asset(name='CAsset_00001', owner='u_HKrish00003', type='Trained_Model', cuid='placeholdcuid')
+    #   api.delete_content_asset(cuid='2343462')
+    #   api.create_content_asset(name='CAsset_00001', owner='u_HKrish00003', type='Trained_Model', cuid='placeholdcuid')
+    #   api.delete_content_asset(cuid='placeholdcuid')
+    #   api.create_content_asset(name='CAsset_00001', owner='u_HKrish00003', type='Trained_Model', cuid='placeholdcuid')
 
-    # Create user assets
-    api.create_user_asset(name='UAsset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
-    api.create_user_asset(name='UAsset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
-    ### Add two policies over which to check for permission.
-    api.test_policy1()
-    api.test_policy2()
+    #   # Create user assets
+    #   api.create_user_asset(name='UAsset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
+    #   api.create_user_asset(name='UAsset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
+    #   ### Add two policies over which to check for permission.
+    #   api.test_policy1()
+    #   api.test_policy2()
 
-    ### Check for blocking of node duplication on create_user_asset.
-    
+    #   ### Check for blocking of node duplication on create_user_asset.
+    #   #['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
 
-    #['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
+    #   #self.archive_user(uuid='u_HKrish00003')
 
-    #self.archive_user(uuid='u_HKrish00003')
+    #   #self.remove_user_content_asset(uuid='u_JSmith00004', from_master=True)
+    #   #self.remove_user_content_asset(uuid='u_HYanxon00001', name='Asset_00001')
+    #   
+    #   # Check access of Smith (general user) to Write to Content
+    #   # take account of owner!!!
+    #   SmithWriteplaceholdcuid = {"SUBJECT_NAME_UID": "u_JSmith00004","OBJECT_NAME_UID": "placeholdcuid", "ACTION_NAME":"Write"}
+    #   cypher_query = '''
+    #   with $SmithWriteplaceholdcuid as req
+    #   // Stage 1 - Subject Conditions
+    #   match (sub:Subject {name:req.SUBJECT_NAME_UID})-[:HAS_ATTR*0..5]->(sc)-[:SUB_CON]->(pol:Policy)
+    #   with req, pol, size(collect(distinct sc)) as sat_cons
+    #   match (pol)<-[:SUB_CON]-(rc)
+    #   with req, pol, sat_cons, size(collect(rc)) as req_cons where req_cons = sat_cons
 
-    #self.remove_user_content_asset(uuid='u_JSmith00004', from_master=True)
-    #self.remove_user_content_asset(uuid='u_HYanxon00001', name='Asset_00001')
-    
-    # Check access of Smith (general user) to Write to Content
-    SmithWriteplaceholdcuid = {"SUBJECT_NAME_UID": "u_JSmith00004","OBJECT_NAME_UID": "placeholdcuid", "ACTION_NAME":"Write"}
-    cypher_query = '''
-    with $SmithWriteplaceholdcuid as req
-    // Stage 1 - Subject Conditions
-    match (sub:Subject {name:req.SUBJECT_NAME_UID})-[:HAS_ATTR*0..5]->(sc)-[:SUB_CON]->(pol:Policy)
-    with req, pol, size(collect(distinct sc)) as sat_cons
-    match (pol)<-[:SUB_CON]-(rc)
-    with req, pol, sat_cons, size(collect(rc)) as req_cons where req_cons = sat_cons
+    #   // Stage 2 - Object Conditions
+    #   match (obj:Object {name:req.OBJECT_NAME_UID})-[:HAS_ATTR*0..5]->(sc)-[:OBJ_CON]->(pol) 
+    #   with req, pol, size(collect(distinct sc)) as sat_cons
+    #   match (pol)<-[:OBJ_CON]-(rc)
+    #   with req, pol, sat_cons, size(collect(rc)) as req_cons where req_cons = sat_cons
 
-    // Stage 2 - Object Conditions
-    match (obj:Object {name:req.OBJECT_NAME_UID})-[:HAS_ATTR*0..5]->(sc)-[:OBJ_CON]->(pol) 
-    with req, pol, size(collect(distinct sc)) as sat_cons
-    match (pol)<-[:OBJ_CON]-(rc)
-    with req, pol, sat_cons, size(collect(rc)) as req_cons where req_cons = sat_cons
+    #   // Stage 3 - Action Conditions
+    #   match (act:Action {name:req.ACTION_NAME})-[:HAS_ATTR*0..5]->(sc)-[:ACT_CON]->(pol) 
+    #   with req, pol, size(collect(distinct sc)) as sat_cons
+    #   match (pol)<-[:ACT_CON]-(rc)
+    #   with req, pol, sat_cons, size(collect(rc)) as req_cons where req_cons = sat_cons 
+    #   return case when count(pol) = 0 or 'Deny' in collect(pol.decision) then 'Deny' else 'Permit' end as decision
+    #   '''
+    #   results = api.session.run(cypher_query, SmithWriteplaceholdcuid=SmithWriteplaceholdcuid).data()
+    #   print(results)
 
-    // Stage 3 - Action Conditions
-    match (act:Action {name:req.ACTION_NAME})-[:HAS_ATTR*0..5]->(sc)-[:ACT_CON]->(pol) 
-    with req, pol, size(collect(distinct sc)) as sat_cons
-    match (pol)<-[:ACT_CON]-(rc)
-    with req, pol, sat_cons, size(collect(rc)) as req_cons where req_cons = sat_cons 
-    return case when count(pol) = 0 or 'Deny' in collect(pol.decision) then 'Deny' else 'Permit' end as decision
-    '''
-    results = api.session.run(cypher_query, SmithWriteplaceholdcuid=SmithWriteplaceholdcuid).data()
-    print(results)
-    
+    users = api.get_all_users({'fname': 'Howard', 'lname': 'Yanxon'})
+    for user in users:
+        print(user)
+
+    users = api.get_all_users({'email': 'smithj123@gmail.com'})
+    for user in users:
+        print(user)
+
     # Close session
     api.driver.close()
-
