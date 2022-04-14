@@ -14,7 +14,7 @@ app = FastAPI(  openapi_url ="/api/lbl-mlexchange/openapi.json",
                 redoc_url   ="/api/lbl-mlexchange/redoc",
              )
 
-api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
+api = userAPI(url="bolt://44.201.1.101:7687", auth=("neo4j", "fans-hope-request"))
  
 ### ROLES ###
 @app.post(API_URL_PREFIX + "/roles", tags=['roles'])
@@ -185,5 +185,12 @@ def get_all_teams():
     teams = api.get_all_teams()
     return teams
 
+@app.get(API_URL_PREFIX + "/users/", tags=['users'])
+def get_users(first_name:Optional[str]=None, last_name:Optional[str]=None, uuid:Optional[str]=None, email:Optional[str]=None):
+    kv = {'fname': first_name, 'lname': last_name, 'uuid': uuid, 'email': email}
+    users = api.get_users(kv)
+    return users
+
 # if __name__ == '__main__':
 #     uvicorn.run("user_api:app", reload=True, port=5000)
+

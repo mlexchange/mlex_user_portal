@@ -513,6 +513,37 @@ class userAPI:
         status = self.session.run(cquery).data()
         return [s['t'] for s in status]
 
+    def get_users(self, key_value):
+        ''' This method will get all users including their profiles.
+            The key will filter out irrelevant users.
+            e.g. key = {'fname': 'Noah'} will return all users with Noah as their first name. '''
+        
+        key_value = {k: v for k, v in key_value.items() if v is not None}
+
+        cquery = '''
+        match (up:UserProfile)
+        return up
+        '''
+        status = self.session.run(cquery).data()
+
+        # Filter users based on the key_value filter, only active users
+        users = []
+        if key_value:
+            for user in status:
+                if user['up']['active']:
+                    truth = True
+                    for k, v in key_value.items():
+                        if user['up'][k] != v: 
+                            truth = False
+                            break
+                
+                if truth: users.append(user['up'])
+            
+        else:
+            for user in status:
+                if user['up']['active']: users.append(user['up'])
+
+        return users
 
     # Make policies
     def test_policy1(self):
@@ -547,8 +578,8 @@ class userAPI:
 
 
 if __name__ == '__main__':
-    api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
-    
+    api = userAPI(url="bolt://44.201.1.101:7687", auth=("neo4j", "fans-hope-request"))
+
     ### For development purposes: creating sample db ###
     # Create neo4j AUTH DB roles
     api.create_role('Admin')
@@ -602,8 +633,6 @@ if __name__ == '__main__':
     api.test_policy2()
 
     ### Check for blocking of node duplication on create_user_asset.
-    
-
     #['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
 
     #self.archive_user(uuid='u_HKrish00003')
@@ -612,6 +641,7 @@ if __name__ == '__main__':
     #self.remove_user_content_asset(uuid='u_HYanxon00001', name='Asset_00001')
     
     # Check access of Smith (general user) to Write to Content
+    # take account of owner!!!
     SmithWriteplaceholdcuid = {"SUBJECT_NAME_UID": "u_JSmith00004","OBJECT_NAME_UID": "placeholdcuid", "ACTION_NAME":"Write"}
     cypher_query = '''
     with $SmithWriteplaceholdcuid as req
@@ -637,6 +667,14 @@ if __name__ == '__main__':
     results = api.session.run(cypher_query, SmithWriteplaceholdcuid=SmithWriteplaceholdcuid).data()
     print(results)
     
+    first_name = None 
+    last_name = None
+    uuid = None
+    email = 'krish@gmail.com'
+    kv = {'fname': first_name, 'lname': last_name, 'uuid': uuid, 'email': email}
+    users = api.get_users(kv)
+    for user in users:
+        print(user)
+
     # Close session
     api.driver.close()
-
