@@ -111,8 +111,9 @@ class ContentAsset(BaseModel):
     content_uid: str = Field(description="Unique ID of Content")
     public: Optional[bool] = Field(description="Accessible publicly by MLExchange Users")
 
-@app.post(API_URL_PREFIX + "/content/", tags=['content'], response_model=ContentAsset)
+@app.post(API_URL_PREFIX + "/content/", tags=['content'])
 def create_content(content_asset: ContentAsset):
+    """ Adds created content from Content Registry to neo4j database. """
     status = api.create_content_asset(
         name=content_asset.name,
         owner=content_asset.owner,
@@ -134,6 +135,7 @@ class UserAssetRegis(BaseModel):
 
 @app.post(API_URL_PREFIX + "/users/{user_id}/userassets/", tags=['users', 'userassets'], response_model=UserAssetRegis)
 def create_user_asset(asset_regis: UserAssetRegis, user_id:str):
+    """ Creates a user asset. """
     status = api.create_user_asset(
         name=asset_regis.name,
         owner=user_id,

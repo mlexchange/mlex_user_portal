@@ -467,6 +467,17 @@ class userAPI:
         status = self.session.run(cquery).data()
         return [s['asset'] for s in status]
 
+    # def get_assets_for_user(self, uuid:str):
+    #     cquery = '''
+    #     MATCH (ca:content)
+    #     RETURN ca AS asset
+    #     UNION ALL
+    #     MATCH (ua:UserAsset)
+    #     RETURN ua AS asset
+    #     '''
+    #     status = self.session.run(cquery).data()
+    #     return [s['asset'] for s in status]
+
     def get_all_roles(self):
         cquery = '''
         match (r:Role)
