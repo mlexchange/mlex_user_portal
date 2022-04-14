@@ -7,7 +7,7 @@ services:
     build:
       context: 'user_portal/'
       dockerfile: 'docker/Dockerfile'
-    command: 'python src/user_portal.py'
+    command: 'python src/router.py'
     volumes:
       - "./user_portal/src:/app/work/src"
     ports:
