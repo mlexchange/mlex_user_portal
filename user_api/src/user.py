@@ -1,8 +1,3 @@
-from readline import get_current_history_length
-#from typing_extensions import Self
-from unittest import result
-
-from numpy import column_stack
 from neo4j import GraphDatabase, basic_auth
 
 class userAPI:
@@ -452,7 +447,7 @@ class userAPI:
             status = self.session.run(cquery).data()
         return [s['up'] for s in status]
 
-    def get_user_metadata(self, uuid:str):
+    def get_metadata_for_user(self, uuid:str):
         """ Returns single user's metadata. """
         cquery = '''
         MATCH (up:UserProfile {uuid:$uuid})
@@ -472,6 +467,17 @@ class userAPI:
         status = self.session.run(cquery).data()
         return [s['asset'] for s in status]
 
+    # def get_assets_for_user(self, uuid:str):
+    #     cquery = '''
+    #     MATCH (ca:content)
+    #     RETURN ca AS asset
+    #     UNION ALL
+    #     MATCH (ua:UserAsset)
+    #     RETURN ua AS asset
+    #     '''
+    #     status = self.session.run(cquery).data()
+    #     return [s['asset'] for s in status]
+
     def get_all_roles(self):
         cquery = '''
         match (r:Role)
@@ -486,8 +492,19 @@ class userAPI:
         return comp
         '''
         status = self.session.run(cquery).data()
-        return [s['cr'] for s in status]
+        return [s['comp'] for s in status]
+    
+    def get_compute_for_user(self, uuid:str):
+        """ Get all compute locations that a single user can access. """
+        parameters = {'uuid':uuid}
+        cquery = '''
+        match (comp:Compute)<-[:user_of]-(u:user {uuid:$uuid})
+        return comp
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        return [s['comp'] for s in status]
 
+        return
     def get_all_teams(self):
         cquery = '''
         match (t:Team)

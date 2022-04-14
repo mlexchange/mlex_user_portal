@@ -1,0 +1,5 @@
+fastapi==0.66.0
+uvicorn==0.14.0
+requests==2.25.1
+pydantic==1.8.2
+neo4j-driver==4.4.2

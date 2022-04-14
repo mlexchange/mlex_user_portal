@@ -7,8 +7,21 @@ services:
     build:
       context: 'user_portal/'
       dockerfile: 'docker/Dockerfile'
-    command: 'python src/user_portal.py'
+    command: 'python src/router.py'
     volumes:
       - "./user_portal/src:/app/work/src"
     ports:
-      - '8050:8050'                     # Do we need to change the port?
+      - '8050:8050'
+
+  user-api:
+      restart: "unless-stopped"
+      container_name: "user-api"
+      build:
+        context: "user_api/"
+        dockerfile: "docker/Dockerfile"
+      volumes:
+        - ./user_api/src:/app/api/src
+      expose:
+        - "5000"
+      ports:
+        - "5000:5000"

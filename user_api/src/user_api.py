@@ -1,6 +1,3 @@
-from enum import Enum
-from importlib.resources import path
-import logging
 from typing import List, Optional
 from unicodedata import name
 
@@ -51,6 +48,7 @@ class UserRegis(BaseModel):
 
 @app.post(API_URL_PREFIX + "/users/", tags=['users'])
 def create_user(user_regis: UserRegis):
+    """ Creates a user. """
     status =  api.create_user(
         fname=user_regis.fname,
         lname=user_regis.lname,
@@ -115,6 +113,7 @@ class ContentAsset(BaseModel):
 
 @app.post(API_URL_PREFIX + "/content/", tags=['content'])
 def create_content(content_asset: ContentAsset):
+    """ Adds created content from Content Registry to neo4j database. """
     status = api.create_content_asset(
         name=content_asset.name,
         owner=content_asset.owner,
@@ -134,8 +133,9 @@ class UserAssetRegis(BaseModel):
     type: str = Field(description="Asset Type Descriptor (ex: dataset)")
     path: str = Field(description="Path to User Asset")
 
-@app.post(API_URL_PREFIX + "/users/{user_id}/userassets/", tags=['users', 'userassets'])
+@app.post(API_URL_PREFIX + "/users/{user_id}/userassets/", tags=['users', 'userassets'], response_model=UserAssetRegis)
 def create_user_asset(asset_regis: UserAssetRegis, user_id:str):
+    """ Creates a user asset. """
     status = api.create_user_asset(
         name=asset_regis.name,
         owner=user_id,
@@ -156,8 +156,8 @@ def get_userdb_metadata(active:bool):
     return user_db
 
 @app.get(API_URL_PREFIX + "/users/{user_id}", tags=['users'])
-def get_user_metadata(user_id:str):
-    userid_metadata = api.get_user_metadata(user_id)
+def get_metadata_for_user(user_id:str):
+    userid_metadata = api.get_metadata_for_user(user_id)
     return userid_metadata
 
 @app.get(API_URL_PREFIX + "/assets/", tags=['assets'])
@@ -175,6 +175,11 @@ def get_all_compute():
     compute = api.get_all_compute()
     return compute
 
+@app.get(API_URL_PREFIX + "/users/{user_id}/compute/", tags=['users','compute'])
+def get_compute_for_user(user_id:str):
+    compute = api.get_compute_for_user(uuid=user_id)
+    return compute
+
 @app.get(API_URL_PREFIX + "/teams/", tags=['teams'])
 def get_all_teams():
     teams = api.get_all_teams()
@@ -186,5 +191,6 @@ def get_users(first_name:Optional[str]=None, last_name:Optional[str]=None, uuid:
     users = api.get_users(kv)
     return users
 
-if __name__ == '__main__':
-    uvicorn.run("user_api:app", reload=True, port=5000)
+# if __name__ == '__main__':
+#     uvicorn.run("user_api:app", reload=True, port=5000)
+
