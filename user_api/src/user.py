@@ -763,7 +763,7 @@ class userAPI:
         {cquery4}
         merge (pol)<-[:SUB_CON]-(s)
         merge (pol)<-[:OBJ_CON]-(o)
-        merge (pol)<-[:ACT_CON]-(act
+        merge (pol)<-[:ACT_CON]-(act)
         '''
         status = self.session.run(cquery, parameters=parameters)
         return status
@@ -1156,8 +1156,8 @@ if __name__ == '__main__':
     
     # Create a Policy
     api.create_new_policy(subject_dict={'Team': ('name', 'MLExchange_Team')}, 
-                          object_dict={'content': ('name', 'CAsset_00001')}, 
-                          action='Full Access', 
+                          object_dict={'content': ('name', 'CAsset_00002')}, 
+                          action='Read', 
                           policy_owner='u_HKrish00003',
                           policy_name='TestPolicy')
 
@@ -1170,9 +1170,9 @@ if __name__ == '__main__':
 
     # Delete a policy
     #api.delete_policy(policy_owner='u_HKrish00003', policy_name='TestPolicy')
-
-    api.change_action_policy(action='Read', policy_owner='u_HKrish00003', policy_name='TestPolicy')
-
+    
+    # Change policy action
+    #api.change_action_policy(action='Read', policy_owner='u_HKrish00003', policy_name='TestPolicy')
 
     ### Check for blocking of node duplication on create_user_asset.
     #['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
