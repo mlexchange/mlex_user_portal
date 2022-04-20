@@ -7,8 +7,8 @@ This API manages user-related objects.
 Currently this application is dockerized. Docker must be installed prior to executing the commands below. Docker Desktop can be installed at https://www.docker.com/products/docker-desktop/, which installs docker. If this approach is used, please remember to open Docker Desktop prior to executing the procedure below.
 
 From the main directory:
-1. In terminal: `cd user_api/src'
-2. `vim user_api.py'
+1. `cd user_api/src`
+2. `vim user_api.py`
 3. Go to line 15 and replace `url` and `auth` information with personal neo4j server information.
 4. Close and return to main directory.
 5. `docker-compose up --build`
