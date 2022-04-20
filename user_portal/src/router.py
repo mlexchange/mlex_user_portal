@@ -6,19 +6,27 @@ import requests
 from dashapp import app
 import mlex_registration
 import mlex_login
-import mlex_home
+import mlex_userhome 
+import mlex_about
+import mlex_logout
+# from mlex_adminhome import layout
 
-page_name = ''
 
 default_layout = [dbc.Row([
     html.Div(dcc.Link('Login', href='/mlex_login'), style={'width':'60px', 'display':'inline-block'}),
     html.Div(dcc.Link('Registration', href='/mlex_registration'), style={'width':'110px', 'display':'inline-block'})])]
 
 loggedin_layout = [dbc.Row([
-    html.Div(dcc.Link('Home', href='/mlex_home'), style={'width':'60px', 'display':'inline-block'}),
+    html.Div(dcc.Link('Home', href='/mlex_userhome'), style={'width':'60px', 'display':'inline-block'}),
     html.Div(dcc.Link('Logout', href='/mlex_logout'), style={'width':'80px', 'display':'inline-block'})])]
 
-pagelogin_layout = [dbc.Row(html.Div(dcc.Link('Registration', href='/mlex_registration'), style={'width':'110px', 'display':'inline-block'}))]
+pagelogin_layout = [dbc.Row([
+    html.Div(dcc.Link('About', href='/mlex_about'), style={'width':'60px', 'display':'inline-block'}),
+    html.Div(dcc.Link('Registration', href='/mlex_registration'), style={'width':'110px', 'display':'inline-block'})])]
+
+pageregis_layout = [dbc.Row([
+    html.Div(dcc.Link('About', href='/mlex_about'), style={'width':'60px', 'display':'inline-block'}),
+    html.Div(dcc.Link('Login', href='/mlex_login'), style={'width':'60px', 'display':'inline-block'})])]
 
 header = dbc.Navbar(    
     dbc.Container(
@@ -74,24 +82,27 @@ app.layout = html.Div(
 @app.callback(
     Output('page-content', 'children'),
     Output('default','children'),
-    [Input('url', 'pathname')])
+    Input('url', 'pathname'))
+
 def display_page(pathname):
     if pathname == "/mlex_registration":
-        return mlex_registration.layout, default_layout
+        return mlex_registration.layout, pageregis_layout
     if pathname == "/mlex_login":
-        # changed loggedin_layout to pagelogin_layout after auth is ready
-        return html.Div([
-            html.H3(f'You are on page {pathname}')
-        ]), loggedin_layout
-    if pathname == "/mlex_home":
+        return mlex_login.layout, pagelogin_layout
+    if pathname == "/mlex_userhome":
         # call verify user here -- read cookie, see if user is true. if false, return to login page.
         #if user_id is true:
-        return mlex_home.layout, loggedin_layout
+        return mlex_userhome.layout, loggedin_layout
     if pathname == "/mlex_logout":
-        return html.Div([
-            html.H3(f'You are on page {pathname}')
-        ]), default_layout
+        return mlex_logout.layout, default_layout
+    else:
+        return mlex_about.layout, default_layout
+
 
 # for testing interface
 if __name__ == "__main__":
-    app.run_server(debug=True, host='0.0.0.0')
+    app.run_server(
+        debug=True,
+        dev_tools_ui=True,
+        dev_tools_props_check=True,
+        host='0.0.0.0')
