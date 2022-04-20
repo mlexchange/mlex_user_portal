@@ -1,11 +1,9 @@
 from typing import List, Optional
-from unicodedata import name
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
-from starlette.config import Config
+
 from user import userAPI
-import uvicorn
 
 API_URL_PREFIX = "/api/v0"
 
@@ -14,7 +12,7 @@ app = FastAPI(  openapi_url ="/api/lbl-mlexchange/openapi.json",
                 redoc_url   ="/api/lbl-mlexchange/redoc",
              )
 
-api = userAPI(url="bolt://44.201.1.101:7687", auth=("neo4j", "fans-hope-request"))
+api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
  
 ### ROLES ###
 @app.post(API_URL_PREFIX + "/roles", tags=['roles'])
@@ -25,7 +23,7 @@ def create_role(role:str):
 @app.post(API_URL_PREFIX + "/users/{user_id}/roles/{role}", tags=['users','roles'])
 def add_user_to_role(user_id:str, role:str):
     """ Assigns a user to a role. """
-    status = api.assign_user_role(user_id,role)
+    status = api.add_user_to_role(user_id,role)
     return status
 
 @app.delete(API_URL_PREFIX + "/users/{user_id}/roles/{role}", tags=['users','roles'])
@@ -58,7 +56,19 @@ def create_user(user_regis: UserRegis):
 
 @app.delete(API_URL_PREFIX + "/users/{user_id}", tags=['users'])
 def archive_user(user_id:str):
-    status = archive_user(user_id)
+    status = api.archive_user(user_id)
+    return status
+
+class UserLogin(BaseModel):
+    email: str = Field(description="Email of User")
+    password: str = Field(description="User's Password")
+
+# temporary placeholder login command
+@app.post(API_URL_PREFIX + "/users/login/", tags=['users'])
+def login_user(user_login: UserLogin):
+    status = api.login_user(
+        email = user_login.email,
+        password = user_login.password)
     return status
 
 ### COMPUTE LOCATIONS ###
@@ -88,19 +98,36 @@ def create_team(team_name:str, team_owner:str):
     status = api.create_team(name=team_name, owner=team_owner)
     return status
 
-@app.post(API_URL_PREFIX + "/users/{user_id}/teams/name/{team_name}/owner/{team_owner}", tags=['users', 'teams'])
-def add_user_to_team(user_id:str, team_name:str, team_owner:str):
+@app.post(API_URL_PREFIX + "/users/{email}/teams/name/{team_name}/owner/{team_owner}", tags=['users', 'teams'])
+def add_user_to_team(email:str, team_name:str, team_owner:str):
+    user_id = str(api.get_uuid_from_email(email))
     status = api.add_user_to_team(uuid=user_id, tname=team_name, towner=team_owner)
     return status
 
-@app.delete(API_URL_PREFIX + "/users/{user_id}/teams/name/{team_name}/owner/{team_owner}", tags=['users', 'teams'])
-def remove_user_from_team(user_id:str, team_name:str, team_owner:str):
+@app.delete(API_URL_PREFIX + "/users/{email}/teams/owner/{team_owner}/name/{team_name}", tags=['users', 'teams'])
+def remove_user_from_team(email:str, team_name:str, team_owner:str):
+    user_id = str(api.get_uuid_from_email(email))
     status = api.remove_user_from_team(uuid=user_id, tname=team_name, towner=team_owner)
     return status
 
-@app.delete(API_URL_PREFIX + "/teams/name/{team_name}/owner/{team_owner}", tags=['teams'])
-def delete_team(team_name:str, team_owner:str):
+@app.delete(API_URL_PREFIX + "/teams/owner/{team_owner}/name/{team_name}", tags=['teams'])
+def delete_team(team_owner:str, team_name:str):
     status = api.delete_team(name=team_name, owner=team_owner)
+    return status
+
+@app.get(API_URL_PREFIX + "/users/{user_id}/teams", tags=['users','teams'])
+def get_teams_for_user(user_id:str):
+    status = api.get_teams_for_user(uuid=user_id)
+    return status
+
+@app.get(API_URL_PREFIX + "/teams/name/{team_name}/owner/{team_owner}", tags=['teams'])
+def get_members_for_team(team_name:str, team_owner:str):
+    status = api.get_members_for_team(tname=team_name, towner=team_owner)
+    return status
+
+@app.get(API_URL_PREFIX + "/users/{user_id}/teams/owned", tags=['users','teams'])
+def get_ownedteams_for_user(user_id:str):
+    status = api.get_teams_for_user(uuid=user_id, owned_only=True)
     return status
 
 ### CONTENT ASSETS ###
@@ -190,7 +217,4 @@ def get_users(first_name:Optional[str]=None, last_name:Optional[str]=None, uuid:
     kv = {'fname': first_name, 'lname': last_name, 'uuid': uuid, 'email': email}
     users = api.get_users(kv)
     return users
-
-# if __name__ == '__main__':
-#     uvicorn.run("user_api:app", reload=True, port=5000)
 
