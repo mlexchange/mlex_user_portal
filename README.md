@@ -9,10 +9,14 @@ Currently this application is dockerized. Docker must be installed prior to exec
 From the main directory:
 1. `cd user_api/src`
 2. `vim user_api.py`
-3. Go to line 15 and replace `url` and `auth` information with personal neo4j server information.
-4. Close and return to main directory.
-5. `docker-compose up --build`
-6. In Docker Desktop: navigate to front-end using the 'open in browser' (far left) option of the 'user-portal' container in 'mlex_user_portal'.
+3. Go to line 15 and replace `url` and `auth` information with personal neo4j server information. Save and exit.
+4. To populate your neo4j server with a sample database:
+    i. `vim user.py`
+    ii. Go to line 716 and replace `url` and `auth` information with neo4j server information. Save and exit.
+    iii. `python user.py` will populate the server with a sample database.
+5. Return to main directory.
+6. `docker-compose up --build`
+7. In Docker Desktop: navigate to front-end using the 'open in browser' (far left) option of the 'user-portal' container in 'mlex_user_portal'.
 
 ## Run FASTAPI
 
