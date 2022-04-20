@@ -1,4 +1,4 @@
-import uuid
+import uuid as UUIDf
 from neo4j import GraphDatabase, basic_auth
 
 class userAPI:
