@@ -659,7 +659,385 @@ class userAPI:
 
         return users
 
+    def create_action(self):
+        cquery = '''
+        merge (read:Action {name:'Read'})-[:has_attr]->(fullAccess:Attribute:Group {name:"Full Access"})<-[:has_attr]-(write:Action {name:'Write'})
+        '''
+        status = self.session.run(cquery)
+        return status
+        
     # Make policies
+    def create_new_policy(self, subject_dict, object_dict, action, policy_owner, policy_name):
+        '''
+        subject_dict = {'Team': ('name', 'MLEx_Team')}
+        object_dict = {'Asset': ('name', 'asdf')}
+        '''
+        # Check if the policy_owner has authority (i.e. admin)
+        # Perhaps, we need to find several roles with one cypher query call in the next version.
+        parameters = {'uuid': policy_owner, 'role': 'Admin'}
+        cquery = '''
+        match (u:user {uuid: $uuid})-[:has_attr]->(r:Role {name: $role})
+        return r
+        '''
+        status1 = self.session.run(cquery, parameters=parameters).data()
+        
+        parameters = {'uuid': policy_owner, 'role': 'MLE Admin'}
+        cquery = '''
+        match (u:user {uuid: $uuid})-[:has_attr]->(r:Role {name: $role})
+        return r
+        '''
+        status2 = self.session.run(cquery, parameters=parameters).data()
+        
+        if not (len(status1) or len(status2)):
+            msg = 'Can\'t create policy. The user is not an authorized user.'
+            raise NotImplementedError(msg)
+
+        # Check whether action is valid.
+        if action not in ['Read', 'Full Access']:
+            msg = ValueError('The action is not available')
+            raise msg
+
+        ''' Check if subject and object exist. '''
+        sub_key = list(subject_dict.keys())[0]
+        sub_val = subject_dict[sub_key] 
+        obj_key = list(object_dict.keys())[0]
+        obj_val = object_dict[obj_key]
+
+        # Check if the owner has the policy already, if not, policy is created.
+        # If the policy doesn't exist, then create a policy.
+        parameters = {'uuid': policy_owner, 'policy_name': policy_name}
+        cquery = '''
+        match (u:user {uuid: $uuid})-[:owner_of]->(p:Policy {name: $policy_name})
+        return p
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if len(status):
+            msg = 'The policy is already been created. Please give different name.'
+            raise ValueError(msg)
+
+        # Check if the object belongs to the owner
+        parameters = {'uuid': policy_owner, 'obj_val1': obj_val[1]}
+        cquery1 = "match (u:user {uuid: $uuid})"
+        cquery2 = f'(o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery = f'''
+        {cquery1}-[r:owner_of]->{cquery2}
+        return r
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The asset/content doesn\'t belong to the user'
+            raise ValueError(msg)
+
+        # Create a relationship between owner and policy.
+        parameters = {'uuid': policy_owner, 'policy_name': policy_name}
+        cquery = '''
+        match (u:user {uuid: $uuid})
+        merge (u)-[:owner_of]->(p:Policy {name: $policy_name, decision: "Permit"})
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+
+        # Create policy, i.e. sub_con, obj_con, and act_con
+        parameters = {'sub_val1': sub_val[1], 'obj_val1': obj_val[1], 'policy_name': policy_name}
+        cquery1 = f'match (s:{sub_key} ' + '{' + f'{sub_val[0]}:' + '$sub_val1})'
+        cquery2 = f'match (o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery = f'''
+        {cquery1}
+        {cquery2}
+        return s, o
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()[0]
+
+        if not (status['s'] and status['o']):
+            msg = ValueError('The subject and/or object node(s) doesn\'t exist')
+            raise msg
+        cquery3 = 'match (fullAccess:Attribute:Group {name:"Full Access"})'
+        cquery4 = 'match (pol:Policy {name: $policy_name})'
+        cquery = f'''
+        {cquery1}
+        {cquery2}
+        {cquery3}
+        {cquery4}
+        merge (pol)<-[:SUB_CON]-(s)
+        merge (pol)<-[:OBJ_CON]-(o)
+        merge (pol)<-[:ACT_CON]-(fullAccess)
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
+
+    def check_policy_owner_relation(self, policy_owner, policy_name):
+        ''' Check if the policy owns by the policy's owner '''
+        parameters = {'uuid': policy_owner, 'policy_name': policy_name}
+        cquery = '''
+        match (u:user {uuid: $uuid})-[r:owner_of]->(p:Policy {name: $policy_name})
+        return u, r, p
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        truth = []
+
+        if len(status):
+            t1 = status[0]['u']['uuid'] == policy_owner
+            t2 = status[0]['r'][1] == 'owner_of'
+            t3 = status[0]['p']['name'] == policy_name
+            t = [t1, t2, t3]
+        
+        return t
+
+    def add_subject_to_policy(self, subject_dict, policy_owner, policy_name):
+        sub_key = list(subject_dict.keys())[0]
+        sub_val = subject_dict[sub_key] 
+        
+        # check if subject exists
+        parameters = {'sub_val1': sub_val[1]}
+        cquery1 = f'match (s:{sub_key} ' + '{' + f'{sub_val[0]}:' + '$sub_val1})'
+        cquery = f'''
+        {cquery1}
+        return s
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The subject doesn\'t exists'
+            raise ValueError(msg)
+
+        # check policy owner and policy relation
+        t = self.check_policy_owner_relation(policy_owner, policy_name)
+        if not t[0]:
+            msg = 'The owner doesn\'t exist'
+            raise ValueError(msg)
+        if not t[1]:
+            msg = 'The user doesn\'t own the policy'
+            raise ValueError(msg)
+        if not t[2]:
+            msg = 'The policy doesn\'t exist'
+            raise ValueError(msg)
+        
+        parameters = {'sub_val1': sub_val[1], 'policy_name': policy_name}
+        cquery1 = f'match (s:{sub_key} ' + '{' + f'{sub_val[0]}:' + '$sub_val1})'
+        cquery2 = 'match (pol:Policy {name: $policy_name})'
+        cquery = f'''
+        {cquery1}
+        {cquery2}
+        merge (pol)<-[:SUB_CON]-(s)
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        
+        return status
+
+    def remove_subject_from_policy(self, subject_dict, policy_owner, policy_name):
+        sub_key = list(subject_dict.keys())[0]
+        sub_val = subject_dict[sub_key] 
+        
+        # check if subject exists
+        parameters = {'sub_val1': sub_val[1]}
+        cquery1 = f'match (s:{sub_key} ' + '{' + f'{sub_val[0]}:' + '$sub_val1})'
+        cquery = f'''
+        {cquery1}
+        return s
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The subject doesn\'t exists'
+            raise ValueError(msg)
+        
+        # check policy owner and policy relation
+        t = self.check_policy_owner_relation(policy_owner, policy_name)
+        if not t[0]:
+            msg = 'The owner doesn\'t exist'
+            raise ValueError(msg)
+        if not t[1]:
+            msg = 'The user doesn\'t own the policy'
+            raise ValueError(msg)
+        if not t[2]:
+            msg = 'The policy doesn\'t exist'
+            raise ValueError(msg)
+
+        parameters = {'sub_val1': sub_val[1], 'policy_name': policy_name}
+        cquery1 = f'(s:{sub_key} ' + '{' + f'{sub_val[0]}:' + '$sub_val1})'
+        cquery2 = '(pol:Policy {name: $policy_name})'
+        cquery = f'''
+        match {cquery2}<-[rel:SUB_CON]-{cquery1}
+        detach delete rel
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+
+        return status
+
+    def add_object_to_policy(self, object_dict, policy_owner, policy_name):
+        obj_key = list(object_dict.keys())[0]
+        obj_val = object_dict[obj_key]
+        
+        # check if object exists
+        parameters = {'obj_val1': obj_val[1]}
+        cquery1 = f'match (o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery = f'''
+        {cquery1}
+        return o
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The object doesn\'t exists'
+            raise ValueError(msg)
+
+        # check policy owner and policy relation
+        t = self.check_policy_owner_relation(policy_owner, policy_name)
+        if not t[0]:
+            msg = 'The owner doesn\'t exist'
+            raise ValueError(msg)
+        if not t[1]:
+            msg = 'The user doesn\'t own the policy'
+            raise ValueError(msg)
+        if not t[2]:
+            msg = 'The policy doesn\'t exist'
+            raise ValueError(msg)
+
+        # check object owner relation
+        parameters = {'uuid': policy_owner, 'obj_val1': obj_val[1]}
+        cquery1 = "match (u:user {uuid: $uuid})"
+        cquery2 = f'(o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery = f'''
+        {cquery1}-[r:owner_of]->{cquery2}
+        return r
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The asset/content doesn\'t belong to the user'
+            raise ValueError(msg)
+
+        # Create the object policy relationship
+        parameters = {'obj_val1': obj_val[1], 'policy_name': policy_name}
+        cquery1 = f'match (o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery2 = 'match (pol:Policy {name: $policy_name})'
+        cquery = f'''
+        {cquery1}
+        {cquery2}
+        merge (pol)<-[:OBJ_CON]-(o)
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        
+        return status
+
+    def remove_object_from_policy(self, object_dict, policy_owner, policy_name):
+        obj_key = list(object_dict.keys())[0]
+        obj_val = object_dict[obj_key] 
+        
+        # check if object exists
+        parameters = {'obj_val1': obj_val[1]}
+        cquery1 = f'match (o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery = f'''
+        {cquery1}
+        return o
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The object doesn\'t exists'
+            raise ValueError(msg)
+        
+        # check policy owner and policy relation
+        t = self.check_policy_owner_relation(policy_owner, policy_name)
+        if not t[0]:
+            msg = 'The owner doesn\'t exist'
+            raise ValueError(msg)
+        if not t[1]:
+            msg = 'The user doesn\'t own the policy'
+            raise ValueError(msg)
+        if not t[2]:
+            msg = 'The policy doesn\'t exist'
+            raise ValueError(msg)
+
+        # check object owner relation
+        parameters = {'uuid': policy_owner, 'obj_val1': obj_val[1]}
+        cquery1 = "match (u:user {uuid: $uuid})"
+        cquery2 = f'(o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery = f'''
+        {cquery1}-[r:owner_of]->{cquery2}
+        return r
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The asset/content doesn\'t belong to the user'
+            raise ValueError(msg)
+
+        parameters = {'obj_val1': obj_val[1], 'policy_name': policy_name}
+        cquery1 = f'(o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery2 = '(pol:Policy {name: $policy_name})'
+        cquery = f'''
+        match {cquery2}<-[rel:OBJ_CON]-{cquery1}
+        detach delete rel
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+
+        return status
+        
+    def change_action_policy(self, action, policy_owner, policy_name):
+        # check policy owner and policy relation
+        t = self.check_policy_owner_relation(policy_owner, policy_name)
+        if not t[0]:
+            msg = 'The owner doesn\'t exist'
+            raise ValueError(msg)
+        if not t[1]:
+            msg = 'The user doesn\'t own the policy'
+            raise ValueError(msg)
+        if not t[2]:
+            msg = 'The policy doesn\'t exist'
+            raise ValueError(msg)
+
+        # Check previous action
+        parameters = {'policy_name': policy_name}
+        if action == 'Read':
+            cquery0 = "match (pol:Policy {name: $policy_name})<-[rel:ACT_CON]-(fullAccess:Attribute:Group {name:'Full Access'})"
+            cquery1 = "match (act:Action {name:'Read'})"
+        else:
+            cquery0 = "match (pol:Policy {name: $policy_name})<-[rel:ACT_CON]-(read:Action {name:'Read'})"
+            cquery1 = "match (act:Attribute:Group {name:'Full Access'})"
+        cquery = f'''
+        {cquery0}
+        return rel
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The action that can\'t be changed due to no relationship found.'
+            raise ValueError(msg)
+        
+        cquery = f'''
+        {cquery0}
+        {cquery1}
+        detach delete rel
+        merge (pol)<-[:ACT_CON]-(act)
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+
+        return status
+
+    def delete_policy(self, policy_owner, policy_name):
+        parameters = {'uuid': policy_owner, 'name': policy_name}
+        cquery = '''
+        match (u:user {uuid: $uuid})-[:owner_of]->(p:Policy {name: $name})
+        //detach delete p
+        return u, p
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if len(status):
+            user = status[0]['u']
+            policy = status[0]['p']
+            if not policy:
+                msg = 'The policy doesn\'t exist'
+                raise ValueError(msg)
+        else:
+            msg = 'The user and/or the policy don\'t exist'
+            raise ValueError(msg)
+               
+        parameters = {'uuid': policy_owner, 'name': policy_name}
+        cquery = '''
+        match (u:user {uuid: $uuid})-[:owner_of]->(p:Policy {name: $name})
+        detach delete p
+        return u, p
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+
+        return status
+
+
+    # Make policies
+    # test_policy1 and test_policy2 are depreciated. They will be deleted in the next update.
     def test_policy1(self):
         ''' Admin have full access ALL database objects and assets. '''
         cquery = '''
