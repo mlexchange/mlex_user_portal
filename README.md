@@ -4,13 +4,11 @@ This API manages user-related objects.
 
 ## How to use
 
-Populate this later
+Currently this application is dockerized. Docker must be installed prior to executing the commands below. Docker Desktop can be installed at https://www.docker.com/products/docker-desktop/, which installs docker. If this approach is used, please remember to open Docker Desktop prior to executing the procedure below.
 
-## To do list
-
-1. Populate the user\_api/user.py with notebooks/neo4j\_functions.ipynb (neo4j-driver)
-2. Dockerize User Portal API
-3. Code user\_api/fast\_api.py for user login / sign up
+From the main directory:
+1. In terminal: `docker-compose up --build`
+2. In Docker Desktop: navigate to front-end using the 'open in browser' (far left) option of the 'user-portal' container in 'mlex_user_portal'.
 
 
 ## Run FASTAPI
