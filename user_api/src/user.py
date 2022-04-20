@@ -1,3 +1,4 @@
+import uuid
 from neo4j import GraphDatabase, basic_auth
 
 class userAPI:
@@ -72,22 +73,22 @@ class userAPI:
         return status
 
     def remove_user_from_role(self, uuid, role):
-        """ Removes a role of a user and sets user role to general user. """
+        """ Removes a role of a user and sets user role to Unapproved. """
         parameters = {'uuid': uuid, 'role': role}
         cquery = '''
         MATCH (u:user {uuid: $uuid})-[rel:has_attr]->(r:Role {name:$role})
         DELETE rel
-        WITH MATCH (u), (role:Role {name:'General User'})
+        WITH MATCH (u), (role:Role {name:'Unapproved'})
         MERGE (u)-[:has_attr]->(role)
         RETURN u.uuid
         '''
         user_id = self.session.run(cquery, parameters=parameters)
-        status = print("User " + str(user_id) + " has been removed from the " + str(role) + " and is now a General User.")
+        status = print("User " + str(user_id) + " has been removed from the " + str(role) + " and is now an Unapproved user.")
         return status
 
     ### USERS ###
     def create_user(self, fname, lname, email, orcid):
-        """ A function to add user node. Every user is assigned as General User after sign-up. """
+        """ A function to add user node. Every user is assigned as Unapproved after sign-up. """
         test_query = '''
         MATCH (up:UserProfile {fname:$fname, lname:$lname, email:$email, orcid:$orcid})
         RETURN count(up) as counts
@@ -102,7 +103,7 @@ class userAPI:
             dbindx = len([dict(_) for _ in self.session.run(cquery)]) + 1
             temp_id = 'u_' + str(fname[0] + lname + str(dbindx).zfill(5))
             
-            parameters = {'temp_id': temp_id, 'fname': fname, 'lname': lname, 'email': email, 'orcid': orcid, 'role': 'General User'}
+            parameters = {'temp_id': temp_id, 'fname': fname, 'lname': lname, 'email': email, 'orcid': orcid, 'role': 'Unapproved'}
             cquery = '''
             MATCH (r:Role {name:$role})
             MERGE (up:UserProfile:Object 
@@ -145,24 +146,40 @@ class userAPI:
         return status
     
     ### COMPUTE LOCATIONS ###
-    def create_compute(self, name:str, hostname:str):
+    def create_compute(self, name:str, hostname:str, public=True, uuid:str=None):
         """
         Create a compute location node. Name and location must uniquely define compute.
         """
-        parameters = {'name': name, 'hostname': hostname}
-        cquery = '''
-        CALL {
-            MATCH (cl:Compute {name:$name, hostname:$hostname})
-            RETURN count(cl) AS counts
-            }
-        WITH counts, $name AS cl_name, $hostname AS cl_hostname
-        CALL apoc.do.when(counts > 0,
-            'RETURN toInteger(0) AS result',
-            'CREATE (comp:Compute:Object {name:cl_name, hostname:cl_hostname}) RETURN toInteger(1) AS result',
-            {counts:counts, cl_name:cl_name, cl_hostname:cl_hostname}) YIELD value
-        RETURN value.result as result
-        '''
-        index = self.session.run(cquery, parameters=parameters).data()[0].get('result')
+        if public:
+            parameters = {'name': name, 'hostname': hostname}
+            cquery = '''
+            CALL {
+                MATCH (cl:Compute {name:$name, hostname:$hostname})
+                RETURN count(cl) AS counts
+                }
+            WITH counts, $name AS cl_name, $hostname AS cl_hostname
+            CALL apoc.do.when(counts > 0,
+                'RETURN toInteger(0) AS result',
+                'MATCH (pub:Public) MERGE (comp:Compute:Object {name:cl_name, hostname:cl_hostname})-[:has_attr]->(pub) RETURN toInteger(1) AS result',
+                {counts:counts, cl_name:cl_name, cl_hostname:cl_hostname}) YIELD value
+            RETURN value.result as result
+            '''
+            index = self.session.run(cquery, parameters=parameters).data()[0].get('result')
+        else:
+            parameters = {'uuid':uuid, 'name': name, 'hostname': hostname}
+            cquery = '''
+            CALL {
+                MATCH (cl:Compute {name:$name, hostname:$hostname})
+                RETURN count(cl) AS counts
+                }
+            WITH counts, $name AS cl_name, $hostname AS cl_hostname, $uuid AS user_id
+            CALL apoc.do.when(counts > 0,
+                'RETURN toInteger(0) AS result',
+                'MATCH (u:user {uuid:user_id}) MERGE (comp:Compute:Object {name:cl_name, hostname:cl_hostname})<-[:owner_of]-(u) RETURN toInteger(1) AS result',
+                {counts:counts, cl_name:cl_name, cl_hostname:cl_hostname, user_id:user_id}) YIELD value
+            RETURN value.result as result
+            '''
+            index = self.session.run(cquery, parameters=parameters).data()[0].get('result')
         if index == 0:
             status = print("[WARNING] Compute location was not created. Please choose a different name and/or location to successfully create.") 
         else:
@@ -304,27 +321,48 @@ class userAPI:
         return status
 
     ### CONTENT (MLExchange-Hosted Assets) and USER (unhosted, private) ASSETS ###
-    def create_user_asset(self, name:str, owner:str, type:str, path:str):
+    def create_user_asset(self, name:str, owner:str, type:str, path:str, public=False):
         ''' Adds a customizable user asset after checking for existance of duplicates. Transaction-locked query.'''
         parameters = {'name': name, 'owner': owner, 'path': path, 'type': type}
-        cquery = '''
-        CALL {
-                MATCH (ua:UserAsset {name:$name, owner:$owner, path:$path, type:$type})
-                RETURN count(ua) AS counts
-            }
+        if public:
+            cquery = '''
+            CALL {
+                    MATCH (ua:UserAsset {name:$name, owner:$owner, path:$path, type:$type})
+                    RETURN count(ua) AS counts
+                }
 
-        WITH counts
-        CALL apoc.do.when(counts = 0,
-            'CREATE (ua:UserAsset:Object:Primitive {uauid: toString((name)+toString(timestamp()))}) RETURN ua.uauid AS result',
-            '',
-            {counts:counts, name:$name}) YIELD value
+            WITH counts
+            CALL apoc.do.when(counts = 0,
+                'CREATE (ua:UserAsset:Object:Primitive {uauid: toString((name)+toString(timestamp()))}) RETURN ua.uauid AS result',
+                '',
+                {counts:counts, name:$name}) YIELD value
 
-        WITH value.result as ua_uid
-        MATCH (u:user {uuid: $owner}), (ua:UserAsset {uauid:ua_uid})
-        CREATE (u)-[:owner_of]->(ua)
-        SET ua.name = $name, ua.owner = $owner, ua.path = $path, ua.type = $type
-        RETURN ua_uid
-        '''
+            WITH value.result as ua_uid
+            MATCH (u:user {uuid: $owner}), (ua:UserAsset {uauid:ua_uid}), (pub:Public {name:'Public'})
+            CREATE (u)-[:owner_of]->(ua)-[:has_attr]->(pub)
+            SET ua.name = $name, ua.owner = $owner, ua.path = $path, ua.type = $type
+            RETURN ua_uid
+            '''
+        else:
+            cquery = '''
+            CALL {
+                    MATCH (ua:UserAsset {name:$name, owner:$owner, path:$path, type:$type})
+                    RETURN count(ua) AS counts
+                }
+
+            WITH counts
+            CALL apoc.do.when(counts = 0,
+                'CREATE (ua:UserAsset:Object:Primitive {uauid: toString((name)+toString(timestamp()))}) RETURN ua.uauid AS result',
+                '',
+                {counts:counts, name:$name}) YIELD value
+
+            WITH value.result as ua_uid
+            MATCH (u:user {uuid: $owner}), (ua:UserAsset {uauid:ua_uid})
+            CREATE (u)-[:owner_of]->(ua)
+            SET ua.name = $name, ua.owner = $owner, ua.path = $path, ua.type = $type
+            RETURN ua_uid
+            '''
+        
         ua_uid = self.session.run(cquery, parameters=parameters).data()
         if ua_uid:
             status = print("User Asset ID " + str(ua_uid[0].get('ua_uid')) + " has been created!")
@@ -334,8 +372,8 @@ class userAPI:
     
     def create_content_asset(self, name:str, owner:str, type:str, cuid:str, public=False):
         ''' Registers creation of new assets from content registry. Transaction-locked query.'''
+        parameters = {'name': name, 'owner': owner, 'type': type, 'cuid':cuid}
         if public:
-            parameters = {'name': name, 'owner': owner, 'type': type, 'cuid':cuid}
             cquery = '''
             CALL {
                 MATCH (ca:content {cuid:$cuid})
@@ -349,9 +387,9 @@ class userAPI:
                 {counts:counts, c_uid:c_uid}) YIELD value
 
             WITH value.result as ca_uid
-            MATCH (u:user {uuid: $owner}), (ca:content {cuid:ca_uid})
-            SET ca.name = $name, ca.owner = $owner, ca.type = $type, ca.public = True
-            CREATE (u)-[:owner_of]->(ca)            
+            MATCH (u:user {uuid: $owner}), (ca:content {cuid:ca_uid}), (pub:Public {name:'Public'})
+            SET ca.name = $name, ca.owner = $owner, ca.type = $type
+            CREATE (u)-[:owner_of]->(ca)-[:has_attr]->(pub)            
             RETURN ca.cuid as cauid
             '''
             ca_uid = self.session.run(cquery, parameters=parameters).data()
@@ -359,10 +397,7 @@ class userAPI:
                 status = print("Public-flagged MLExchange Content has been registered: ID " + str(ca_uid[0].get('cauid')))
             else:
                 status = print("[WARNING] Content ID " + str(cuid) + " already has been registered. Contact Content Registry admin.")
-            return status
-        
         else:
-            parameters = {'name': name, 'owner': owner, 'type': type, 'cuid':cuid}
             cquery = '''
             CALL {
                 MATCH (ca:content {cuid:$cuid})
@@ -377,7 +412,7 @@ class userAPI:
             WITH value.result as ca_uid
             MATCH (u:user {uuid: $owner}), (ca:content {cuid:ca_uid})
             CREATE (u)-[:owner_of]->(ca)
-            SET ca.name = $name, ca.owner = $owner, ca.type = $type, ca.public = False
+            SET ca.name = $name, ca.owner = $owner, ca.type = $type
             RETURN ca.cuid as cauid
             '''
             ca_uid = self.session.run(cquery, parameters=parameters).data()
@@ -447,6 +482,37 @@ class userAPI:
             status = self.session.run(cquery).data()
         return [s['up'] for s in status]
 
+    def get_members_for_team(self, tname:str, towner:str):
+        """ Gets all members for a select team. """
+        parameters = {'tname':tname, 'towner':towner} 
+        cquery = '''
+        MATCH (t:Team {name:$tname, owner:$towner})<-[rel:has_attr]-(u:user)-[:owner_of]->(up:UserProfile)
+        WITH count(rel) AS counts, t, up, u
+            CALL apoc.do.when(counts <> 1,
+                '',
+                'RETURN "Member" AS result',
+                {counts:counts}) YIELD value
+        RETURN up.fname AS fname, up.lname AS lname, up.email AS email, value.result AS membership
+        UNION
+        MATCH (t:Team {name:$tname, owner:$towner})<-[rel:manager_of]-(u:user)-[:owner_of]->(up:UserProfile)
+        WITH count(rel) AS counts, t, up, u
+            CALL apoc.do.when(counts <> 1,
+                '',
+                'RETURN "Manager" AS result',
+                {counts:counts}) YIELD value
+        RETURN up.fname AS fname, up.lname AS lname, up.email AS email, value.result AS membership
+        UNION
+        MATCH (t:Team {name:$tname, owner:$towner})<-[rel:owner_of]-(u:user)-[:owner_of]->(up:UserProfile)
+        WITH count(rel) AS counts, t, up, u
+            CALL apoc.do.when(counts <> 1,
+                '',
+                'RETURN "Owner" AS result',
+                {counts:counts}) YIELD value
+        RETURN up.fname AS fname, up.lname AS lname, up.email AS email, value.result AS membership
+        '''
+        mem_team_dict = self.session.run(cquery,parameters=parameters).data()
+        return mem_team_dict
+
     def get_metadata_for_user(self, uuid:str):
         """ Returns single user's metadata. """
         cquery = '''
@@ -504,7 +570,6 @@ class userAPI:
         status = self.session.run(cquery, parameters=parameters).data()
         return [s['comp'] for s in status]
 
-        return
     def get_all_teams(self):
         cquery = '''
         match (t:Team)
@@ -512,6 +577,55 @@ class userAPI:
         '''
         status = self.session.run(cquery).data()
         return [s['t'] for s in status]
+
+    def get_teams_for_user(self, uuid:str, owned_only=False):
+        parameters = {'uuid':uuid}
+        if owned_only:
+            cquery = '''
+            MATCH (t:Team {owner:$uuid})
+            RETURN t.name AS tname
+            '''
+            teams_list = self.session.run(cquery,parameters=parameters).data()
+            return [t['tname'] for t in teams_list]
+        else:
+            cquery = '''
+            MATCH (u:user {uuid:$uuid})-[rel:has_attr]->(t:Team)<-[own_01:owner_of]-(u_01:user)-[own_02:owner_of]->(up:UserProfile)
+            WITH count(rel) AS counts, t, up, u_01
+            CALL apoc.do.when(counts <> 1,
+                '',
+                'RETURN "Member" AS result',
+                {counts:counts}) YIELD value
+            RETURN t.name AS tname, t.owner AS towner, up.fname AS towner_fname, up.lname AS towner_lname, value.result AS membership
+            UNION
+            MATCH (u:user {uuid:$uuid})-[rel:owner_of]->(t:Team)
+            WITH count(rel) AS counts, t, u
+            CALL apoc.do.when(counts <> 1,
+                '',
+                'RETURN "Owner" AS result',
+                {counts:counts}) YIELD value
+            RETURN t.name AS tname, t.owner AS towner, '' AS towner_fname, '' AS towner_lname, value.result AS membership
+            UNION
+            MATCH (u:user {uuid:$uuid})-[rel:manager_of]->(t:Team)<-[own_01:owner_of]-(u_01:user)-[own_02:owner_of]->(up:UserProfile)
+            WITH count(rel) AS counts, t, up, u_01
+            CALL apoc.do.when(counts <> 1,
+                '',
+                'RETURN "Manager" AS result',
+                {counts:counts}) YIELD value
+            RETURN t.name AS tname, t.owner AS towner, up.fname AS towner_fname, up.lname AS towner_lname, value.result AS membership
+            '''
+            teams_dict = self.session.run(cquery,parameters=parameters).data()
+            return teams_dict
+
+    def get_uuid_from_email(self, email:str):
+        ''' Uses an email to retrieve a uuid. '''
+        parameters={'email':email}
+        cquery = '''
+        MATCH (u:user)-[:owner_of]->(up:UserProfile {email:$email})
+        RETURN u.uuid AS uuid
+        '''
+        uuid = self.session.run(cquery, parameters=parameters).data()[0]['uuid']
+        print(uuid)
+        return uuid
 
     def get_users(self, key_value):
         ''' This method will get all users including their profiles.
@@ -547,15 +661,18 @@ class userAPI:
 
     # Make policies
     def test_policy1(self):
-        ''' Admin have full access of profiles. '''
+        ''' Admin have full access ALL database objects and assets. '''
         cquery = '''
-        /// Policy 1 - Admin has full access to UserProfiles 
+        /// Policy 1 - Admin has full access to UserProfiles, Content Assets, User Assets, Computing Resources 
         match (admin:Role {name: 'Admin'})
-        match (up:UserProfile)
+        match (up:UserProfile), (ca:content), (ua:UserAsset), (comp:Compute)
         match (act:fullAccess {name:"Full Access"})
         create (pol:Policy {name: 'Policy1', decision: 'Permit'})
         merge (pol)<-[:SUB_CON]-(admin)
         merge (pol)<-[:OBJ_CON]-(up)
+        merge (pol)<-[:OBJ_CON]-(ca)
+        merge (pol)<-[:OBJ_CON]-(ua)
+        merge (pol)<-[:OBJ_CON]-(comp)
         merge (pol)<-[:ACT_CON]-(act);
         '''
         status = self.session.run(cquery)
@@ -576,18 +693,36 @@ class userAPI:
         status = self.session.run(cquery)
         return status
 
+    # For dev-testing AuthUser nodes, create login_user function.
+    def login_user(self, email:str, password:str):
+        parameters = {'email':email, 'password':password}
+        cquery = '''
+        MATCH (au:AuthUser {email:$email, password:$password}) <-[:owner_of]-(u:user)
+        WITH count(au) AS counts
+        CALL apoc.do.when(counts = 1,
+            'RETURN toInteger(1) AS result',
+            'RETURN toInteger(0) AS result',
+            {counts:counts}) YIELD value
+        RETURN value.result AS result
+        '''
+        index = self.session.run(cquery, parameters=parameters).data()[0].get('result')
+        if index == 1:
+            status = bool(True)
+        else:
+            status = bool(False)
+        return status
 
 if __name__ == '__main__':
-    api = userAPI(url="bolt://44.201.1.101:7687", auth=("neo4j", "fans-hope-request"))
+    api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
 
     ### For development purposes: creating sample db ###
     # Create neo4j AUTH DB roles
     api.create_role('Admin')
     api.create_role('MLE Admin')
     api.create_role('MLE User')
-    api.create_role('General User')
+    api.create_role('Unapproved')
 
-    # Create actions
+    # Create actions and public attribute
     def create_action():
         cquery = '''
         merge (read:Action {name:'Read'})-[:has_attr]->(fullAccess:Attribute:Group {name:"Full Access"})<-[:has_attr]-(write:Action {name:'Write'})
@@ -595,6 +730,14 @@ if __name__ == '__main__':
         api.session.run(cquery)
 
     create_action()
+
+    def create_public_attr():
+        cquery = '''
+        merge (p:Public:Attribute {name:'Public'})
+        '''
+        api.session.run(cquery)
+
+    create_public_attr()
 
     # Create users and assign roles
     api.create_user('Howard', 'Yanxon', 'hg.yanxon@gmail.com', 'orcid')
@@ -606,8 +749,10 @@ if __name__ == '__main__':
     api.create_user('John', 'Smith', 'smithj123@gmail.com', 'orcid')
 
     # Add compute location
-    api.delete_compute(name='Aardvark', hostname='aardvark.anl.gov')
+    api.create_compute(name='Aardvark', hostname='aardvark.anl.gov', public=False, uuid='u_HKrish00003')
     api.create_compute(name='MLSandbox', hostname='mlsandbox.als.lbl.gov')
+    api.create_compute(name='Vaughan', hostname='vaughan.als.lbl.gov')
+    api.create_compute(name='NERSC-Perlmutter', hostname='perlmutter.nersc.gov')
     api.add_user_to_compute(uuid='u_EHolman00002', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
     api.add_user_to_compute(uuid='u_JSmith00004', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
     api.remove_user_from_compute(uuid='u_EHolman00002', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
@@ -615,6 +760,8 @@ if __name__ == '__main__':
     # Add Team
     api.delete_team(name='MLExchange_Team', owner='u_EHolman00002')
     api.create_team(name='MLExchange_Team', owner='u_EHolman00002')
+    api.create_team(name='random team', owner='u_HKrish00003')
+    api.add_user_to_team(uuid='u_EHolman00002', tname='random team', towner='u_HKrish00003')
     api.add_user_to_team(uuid='u_HKrish00003', tname='MLExchange_Team', towner='u_EHolman00002')
     api.remove_user_from_team(uuid='u_HKrish00003', tname='MLExchange_Team', towner='u_EHolman00002')
 
@@ -623,7 +770,7 @@ if __name__ == '__main__':
     api.delete_content_asset(cuid='2343462')
     api.create_content_asset(name='CAsset_00001', owner='u_HKrish00003', type='Trained_Model', cuid='placeholdcuid')
     api.delete_content_asset(cuid='placeholdcuid')
-    api.create_content_asset(name='CAsset_00001', owner='u_HKrish00003', type='Trained_Model', cuid='placeholdcuid')
+    api.create_content_asset(name='CAsset_00002', owner='u_HKrish00003', type='Trained_Model', cuid='placeholdcuid', public=True)
 
     # Create user assets
     api.create_user_asset(name='UAsset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
@@ -640,7 +787,7 @@ if __name__ == '__main__':
     #self.remove_user_content_asset(uuid='u_JSmith00004', from_master=True)
     #self.remove_user_content_asset(uuid='u_HYanxon00001', name='Asset_00001')
     
-    # Check access of Smith (general user) to Write to Content
+    # Check access of Smith (Unapproved) to Write to Content
     # take account of owner!!!
     SmithWriteplaceholdcuid = {"SUBJECT_NAME_UID": "u_JSmith00004","OBJECT_NAME_UID": "placeholdcuid", "ACTION_NAME":"Write"}
     cypher_query = '''
@@ -667,14 +814,33 @@ if __name__ == '__main__':
     results = api.session.run(cypher_query, SmithWriteplaceholdcuid=SmithWriteplaceholdcuid).data()
     print(results)
     
-    first_name = None 
-    last_name = None
-    uuid = None
-    email = 'krish@gmail.com'
-    kv = {'fname': first_name, 'lname': last_name, 'uuid': uuid, 'email': email}
-    users = api.get_users(kv)
-    for user in users:
-        print(user)
+    # Create placeholder auth information for testini user and testAdmin nodes.
+    def create_auth_node(email:str, password:str):
+        parameters = {'email':email, 'password':password}
+        c_query = '''
+        MATCH (u:user)-[:owner_of]->(up:UserProfile {email:$email})
+        MERGE (n:AuthUser {email:$email, password:$password})<-[:owner_of]-(u)
+        RETURN n
+        '''
+        status = api.session.run(c_query, parameters=parameters)
+        return status
+    
+    # test login page processing with placeholder auth
+    api.create_user("Test", "Initial", "testini@test.com", "orcid00001")
+    api.add_user_to_role(uuid='u_TInitial00005', role="MLE User")
+    api.add_user_to_team(uuid='u_TInitial00005', tname='random team', towner='u_HKrish00003')
+    api.add_user_to_compute(uuid='u_TInitial00005', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
+    api.add_user_to_compute(uuid='u_TInitial00005', cname='NERSC-Perlmutter', chostname='perlmutter.nersc.gov')
+    api.create_team(name='Testini Realm', owner='u_TInitial00005')
+    api.create_user("Test", "Admin", "testeradmin@admin.gov", "orcid00002")
+    api.add_user_to_role(uuid='u_TAdmin00006', role="Admin")
+    create_auth_node(email='testini@test.com', password='mleuser')
+    create_auth_node(email='testeradmin@admin.gov', password='admin')
+
+    #test get_teams_for_user()
+    api.get_teams_for_user('u_TInitial00005')
+    api.get_uuid_from_email(email='hg.yanxon@gmail.com')
+    api.get_members_for_team('Testini Realm', 'u_TInitial00005')
 
     # Close session
     api.driver.close()
