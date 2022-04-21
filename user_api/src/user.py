@@ -624,16 +624,23 @@ class userAPI:
         RETURN u.uuid AS uuid
         '''
         uuid = self.session.run(cquery, parameters=parameters).data()[0]['uuid']
-        print(uuid)
         return uuid
 
-    def get_users(self, key_value):
+    def get_users(self, key_value, requestor):
         ''' This method will get all users including their profiles.
             The key will filter out irrelevant users.
             e.g. key = {'fname': 'Noah'} will return all users with Noah as their first name. '''
         
-        key_value = {k: v for k, v in key_value.items() if v is not None}
+        # Check if the requestor role
+        parameters = {'uuid': requestor}
+        cquery = '''
+        match (u:user {uuid:$uuid})-[:has_attr]->(r:Role)
+        return r
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        role = status[0]['r']['name']
 
+        key_value = {k: v for k, v in key_value.items() if v is not None}
         cquery = '''
         match (up:UserProfile)
         return up
@@ -656,6 +663,10 @@ class userAPI:
         else:
             for user in status:
                 if user['up']['active']: users.append(user['up'])
+        
+        if role != 'Admin':
+            for user in users:
+                del user['uuid']
 
         return users
 
@@ -1096,7 +1107,9 @@ class userAPI:
 
 if __name__ == '__main__':
     #api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
-    api = userAPI(url="bolt://3.87.1.58:7687", auth=("neo4j", "interviewer-networks-armament"))
+    api = userAPI(url="bolt://44.202.196.68:7687", auth=("neo4j", "defect-town-lifeboat"))
+    #kv = {'fname': None, 'lname': None, 'uuid': None, 'email': None} 
+    #api.get_users(kv, requestor='u_HYanxon00001')
 
     ### For development purposes: creating sample db ###
     # Create neo4j AUTH DB roles

@@ -217,4 +217,3 @@ def get_users(first_name:Optional[str]=None, last_name:Optional[str]=None, uuid:
     kv = {'fname': first_name, 'lname': last_name, 'uuid': uuid, 'email': email}
     users = api.get_users(kv)
     return users
-
