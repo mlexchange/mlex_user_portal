@@ -1,4 +1,3 @@
-import uuid
 from neo4j import GraphDatabase, basic_auth
 
 class userAPI:
@@ -625,16 +624,27 @@ class userAPI:
         RETURN u.uuid AS uuid
         '''
         uuid = self.session.run(cquery, parameters=parameters).data()[0]['uuid']
+<<<<<<< HEAD
         #print(uuid)
+=======
+>>>>>>> main
         return uuid
 
-    def get_users(self, key_value):
+    def get_users(self, key_value, requestor):
         ''' This method will get all users including their profiles.
             The key will filter out irrelevant users.
             e.g. key = {'fname': 'Noah'} will return all users with Noah as their first name. '''
         
-        key_value = {k: v for k, v in key_value.items() if v is not None}
+        # Check if the requestor role
+        parameters = {'uuid': requestor}
+        cquery = '''
+        match (u:user {uuid:$uuid})-[:has_attr]->(r:Role)
+        return r
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        role = status[0]['r']['name']
 
+        key_value = {k: v for k, v in key_value.items() if v is not None}
         cquery = '''
         match (up:UserProfile)
         return up
@@ -657,10 +667,396 @@ class userAPI:
         else:
             for user in status:
                 if user['up']['active']: users.append(user['up'])
+        
+        if role != 'Admin':
+            for user in users:
+                del user['uuid']
 
         return users
 
+    def create_action(self):
+        cquery = '''
+        merge (read:Action {name:'Read'})-[:has_attr]->(fullAccess:Attribute:Group {name:"Full Access"})<-[:has_attr]-(write:Action {name:'Write'})
+        '''
+        status = self.session.run(cquery)
+        return status
+        
     # Make policies
+    def create_new_policy(self, subject_dict, object_dict, action, policy_owner, policy_name):
+        '''
+        subject_dict = {'Team': ('name', 'MLEx_Team')}
+        object_dict = {'Asset': ('name', 'asdf')}
+        '''
+        # Check if the policy_owner has authority (i.e. admin)
+        # Perhaps, we need to find several roles with one cypher query call in the next version.
+        parameters = {'uuid': policy_owner, 'role': 'Admin'}
+        cquery = '''
+        match (u:user {uuid: $uuid})-[:has_attr]->(r:Role {name: $role})
+        return r
+        '''
+        status1 = self.session.run(cquery, parameters=parameters).data()
+        
+        parameters = {'uuid': policy_owner, 'role': 'MLE Admin'}
+        cquery = '''
+        match (u:user {uuid: $uuid})-[:has_attr]->(r:Role {name: $role})
+        return r
+        '''
+        status2 = self.session.run(cquery, parameters=parameters).data()
+        
+        if not (len(status1) or len(status2)):
+            msg = 'Can\'t create policy. The user is not an authorized user.'
+            raise NotImplementedError(msg)
+
+        # Check whether action is valid.
+        if action not in ['Read', 'Full Access']:
+            msg = ValueError('The action is not available')
+            raise msg
+
+        ''' Check if subject and object exist. '''
+        sub_key = list(subject_dict.keys())[0]
+        sub_val = subject_dict[sub_key] 
+        obj_key = list(object_dict.keys())[0]
+        obj_val = object_dict[obj_key]
+
+        # Check if the owner has the policy already, if not, policy is created.
+        # If the policy doesn't exist, then create a policy.
+        parameters = {'uuid': policy_owner, 'policy_name': policy_name}
+        cquery = '''
+        match (u:user {uuid: $uuid})-[:owner_of]->(p:Policy {name: $policy_name})
+        return p
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if len(status):
+            msg = 'The policy is already been created. Please give different name.'
+            raise ValueError(msg)
+
+        # Check if the object belongs to the owner
+        parameters = {'uuid': policy_owner, 'obj_val1': obj_val[1]}
+        cquery1 = "match (u:user {uuid: $uuid})"
+        cquery2 = f'(o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery = f'''
+        {cquery1}-[r:owner_of]->{cquery2}
+        return r
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The asset/content doesn\'t belong to the user'
+            raise ValueError(msg)
+
+        # Create a relationship between owner and policy.
+        parameters = {'uuid': policy_owner, 'policy_name': policy_name}
+        cquery = '''
+        match (u:user {uuid: $uuid})
+        merge (u)-[:owner_of]->(p:Policy {name: $policy_name, decision: "Permit"})
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+
+        # Create policy, i.e. sub_con, obj_con, and act_con
+        parameters = {'sub_val1': sub_val[1], 'obj_val1': obj_val[1], 'policy_name': policy_name}
+        cquery1 = f'match (s:{sub_key} ' + '{' + f'{sub_val[0]}:' + '$sub_val1})'
+        cquery2 = f'match (o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery = f'''
+        {cquery1}
+        {cquery2}
+        return s, o
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()[0]
+
+        if not (status['s'] and status['o']):
+            msg = ValueError('The subject and/or object node(s) doesn\'t exist')
+            raise msg
+
+        if action == 'Read':
+            cquery3 = 'match (act:Action {name:"Read"})'
+        else:
+            cquery3 = 'match (act:Attribute:Group {name:"Full Access"})'
+        cquery4 = 'match (pol:Policy {name: $policy_name})'
+        cquery = f'''
+        {cquery1}
+        {cquery2}
+        {cquery3}
+        {cquery4}
+        merge (pol)<-[:SUB_CON]-(s)
+        merge (pol)<-[:OBJ_CON]-(o)
+        merge (pol)<-[:ACT_CON]-(act)
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+        return status
+
+    def check_policy_owner_relation(self, policy_owner, policy_name):
+        ''' Check if the policy owns by the policy's owner '''
+        parameters = {'uuid': policy_owner, 'policy_name': policy_name}
+        cquery = '''
+        match (u:user {uuid: $uuid})-[r:owner_of]->(p:Policy {name: $policy_name})
+        return u, r, p
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        truth = []
+
+        if len(status):
+            t1 = status[0]['u']['uuid'] == policy_owner
+            t2 = status[0]['r'][1] == 'owner_of'
+            t3 = status[0]['p']['name'] == policy_name
+            t = [t1, t2, t3]
+        
+        return t
+
+    def add_subject_to_policy(self, subject_dict, policy_owner, policy_name):
+        sub_key = list(subject_dict.keys())[0]
+        sub_val = subject_dict[sub_key] 
+        
+        # check if subject exists
+        parameters = {'sub_val1': sub_val[1]}
+        cquery1 = f'match (s:{sub_key} ' + '{' + f'{sub_val[0]}:' + '$sub_val1})'
+        cquery = f'''
+        {cquery1}
+        return s
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The subject doesn\'t exists'
+            raise ValueError(msg)
+
+        # check policy owner and policy relation
+        t = self.check_policy_owner_relation(policy_owner, policy_name)
+        if not t[0]:
+            msg = 'The owner doesn\'t exist'
+            raise ValueError(msg)
+        if not t[1]:
+            msg = 'The user doesn\'t own the policy'
+            raise ValueError(msg)
+        if not t[2]:
+            msg = 'The policy doesn\'t exist'
+            raise ValueError(msg)
+        
+        parameters = {'sub_val1': sub_val[1], 'policy_name': policy_name}
+        cquery1 = f'match (s:{sub_key} ' + '{' + f'{sub_val[0]}:' + '$sub_val1})'
+        cquery2 = 'match (pol:Policy {name: $policy_name})'
+        cquery = f'''
+        {cquery1}
+        {cquery2}
+        merge (pol)<-[:SUB_CON]-(s)
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        
+        return status
+
+    def remove_subject_from_policy(self, subject_dict, policy_owner, policy_name):
+        sub_key = list(subject_dict.keys())[0]
+        sub_val = subject_dict[sub_key] 
+        
+        # check if subject exists
+        parameters = {'sub_val1': sub_val[1]}
+        cquery1 = f'match (s:{sub_key} ' + '{' + f'{sub_val[0]}:' + '$sub_val1})'
+        cquery = f'''
+        {cquery1}
+        return s
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The subject doesn\'t exists'
+            raise ValueError(msg)
+        
+        # check policy owner and policy relation
+        t = self.check_policy_owner_relation(policy_owner, policy_name)
+        if not t[0]:
+            msg = 'The owner doesn\'t exist'
+            raise ValueError(msg)
+        if not t[1]:
+            msg = 'The user doesn\'t own the policy'
+            raise ValueError(msg)
+        if not t[2]:
+            msg = 'The policy doesn\'t exist'
+            raise ValueError(msg)
+
+        parameters = {'sub_val1': sub_val[1], 'policy_name': policy_name}
+        cquery1 = f'(s:{sub_key} ' + '{' + f'{sub_val[0]}:' + '$sub_val1})'
+        cquery2 = '(pol:Policy {name: $policy_name})'
+        cquery = f'''
+        match {cquery2}<-[rel:SUB_CON]-{cquery1}
+        detach delete rel
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+
+        return status
+
+    def add_object_to_policy(self, object_dict, policy_owner, policy_name):
+        obj_key = list(object_dict.keys())[0]
+        obj_val = object_dict[obj_key]
+        
+        # check if object exists
+        parameters = {'obj_val1': obj_val[1]}
+        cquery1 = f'match (o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery = f'''
+        {cquery1}
+        return o
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The object doesn\'t exists'
+            raise ValueError(msg)
+
+        # check policy owner and policy relation
+        t = self.check_policy_owner_relation(policy_owner, policy_name)
+        if not t[0]:
+            msg = 'The owner doesn\'t exist'
+            raise ValueError(msg)
+        if not t[1]:
+            msg = 'The user doesn\'t own the policy'
+            raise ValueError(msg)
+        if not t[2]:
+            msg = 'The policy doesn\'t exist'
+            raise ValueError(msg)
+
+        # check object owner relation
+        parameters = {'uuid': policy_owner, 'obj_val1': obj_val[1]}
+        cquery1 = "match (u:user {uuid: $uuid})"
+        cquery2 = f'(o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery = f'''
+        {cquery1}-[r:owner_of]->{cquery2}
+        return r
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The asset/content doesn\'t belong to the user'
+            raise ValueError(msg)
+
+        # Create the object policy relationship
+        parameters = {'obj_val1': obj_val[1], 'policy_name': policy_name}
+        cquery1 = f'match (o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery2 = 'match (pol:Policy {name: $policy_name})'
+        cquery = f'''
+        {cquery1}
+        {cquery2}
+        merge (pol)<-[:OBJ_CON]-(o)
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        
+        return status
+
+    def remove_object_from_policy(self, object_dict, policy_owner, policy_name):
+        obj_key = list(object_dict.keys())[0]
+        obj_val = object_dict[obj_key] 
+        
+        # check if object exists
+        parameters = {'obj_val1': obj_val[1]}
+        cquery1 = f'match (o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery = f'''
+        {cquery1}
+        return o
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The object doesn\'t exists'
+            raise ValueError(msg)
+        
+        # check policy owner and policy relation
+        t = self.check_policy_owner_relation(policy_owner, policy_name)
+        if not t[0]:
+            msg = 'The owner doesn\'t exist'
+            raise ValueError(msg)
+        if not t[1]:
+            msg = 'The user doesn\'t own the policy'
+            raise ValueError(msg)
+        if not t[2]:
+            msg = 'The policy doesn\'t exist'
+            raise ValueError(msg)
+
+        # check object owner relation
+        parameters = {'uuid': policy_owner, 'obj_val1': obj_val[1]}
+        cquery1 = "match (u:user {uuid: $uuid})"
+        cquery2 = f'(o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery = f'''
+        {cquery1}-[r:owner_of]->{cquery2}
+        return r
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The asset/content doesn\'t belong to the user'
+            raise ValueError(msg)
+
+        parameters = {'obj_val1': obj_val[1], 'policy_name': policy_name}
+        cquery1 = f'(o:{obj_key} ' + '{' + f'{obj_val[0]}:' + '$obj_val1})'
+        cquery2 = '(pol:Policy {name: $policy_name})'
+        cquery = f'''
+        match {cquery2}<-[rel:OBJ_CON]-{cquery1}
+        detach delete rel
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+
+        return status
+        
+    def change_action_policy(self, action, policy_owner, policy_name):
+        # check policy owner and policy relation
+        t = self.check_policy_owner_relation(policy_owner, policy_name)
+        if not t[0]:
+            msg = 'The owner doesn\'t exist'
+            raise ValueError(msg)
+        if not t[1]:
+            msg = 'The user doesn\'t own the policy'
+            raise ValueError(msg)
+        if not t[2]:
+            msg = 'The policy doesn\'t exist'
+            raise ValueError(msg)
+
+        # Check previous action
+        parameters = {'policy_name': policy_name}
+        if action == 'Read':
+            cquery0 = "match (pol:Policy {name: $policy_name})<-[rel:ACT_CON]-(fullAccess:Attribute:Group {name:'Full Access'})"
+            cquery1 = "match (act:Action {name:'Read'})"
+        else:
+            cquery0 = "match (pol:Policy {name: $policy_name})<-[rel:ACT_CON]-(read:Action {name:'Read'})"
+            cquery1 = "match (act:Attribute:Group {name:'Full Access'})"
+        cquery = f'''
+        {cquery0}
+        return rel
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if not len(status):
+            msg = 'The action that can\'t be changed due to no relationship found.'
+            raise ValueError(msg)
+        
+        cquery = f'''
+        {cquery0}
+        {cquery1}
+        detach delete rel
+        merge (pol)<-[:ACT_CON]-(act)
+        '''
+        status = self.session.run(cquery, parameters=parameters)
+
+        return status
+
+    def delete_policy(self, policy_owner, policy_name):
+        parameters = {'uuid': policy_owner, 'name': policy_name}
+        cquery = '''
+        match (u:user {uuid: $uuid})-[:owner_of]->(p:Policy {name: $name})
+        //detach delete p
+        return u, p
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        if len(status):
+            user = status[0]['u']
+            policy = status[0]['p']
+            if not policy:
+                msg = 'The policy doesn\'t exist'
+                raise ValueError(msg)
+        else:
+            msg = 'The user and/or the policy don\'t exist'
+            raise ValueError(msg)
+               
+        parameters = {'uuid': policy_owner, 'name': policy_name}
+        cquery = '''
+        match (u:user {uuid: $uuid})-[:owner_of]->(p:Policy {name: $name})
+        detach delete p
+        return u, p
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+
+        return status
+
+
+    # Make policies
+    # test_policy1 and test_policy2 are depreciated. They will be deleted in the next update.
     def test_policy1(self):
         ''' Admin have full access ALL database objects and assets. '''
         cquery = '''
@@ -714,7 +1110,10 @@ class userAPI:
         return status
 
 if __name__ == '__main__':
-    api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
+    #api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
+    api = userAPI(url="bolt://44.202.196.68:7687", auth=("neo4j", "defect-town-lifeboat"))
+    #kv = {'fname': None, 'lname': None, 'uuid': None, 'email': None} 
+    #api.get_users(kv, requestor='u_HYanxon00001')
 
     ### For development purposes: creating sample db ###
     # Create neo4j AUTH DB roles
@@ -723,37 +1122,32 @@ if __name__ == '__main__':
     api.create_role('MLE User')
     api.create_role('Unapproved')
 
-    # Create actions and public attribute
-    def create_action():
-        cquery = '''
-        merge (read:Action {name:'Read'})-[:has_attr]->(fullAccess:Attribute:Group {name:"Full Access"})<-[:has_attr]-(write:Action {name:'Write'})
-        '''
-        api.session.run(cquery)
+    # Create actions
+    api.create_action()
 
-    create_action()
-
+    # Create public attribute
     def create_public_attr():
         cquery = '''
         merge (p:Public:Attribute {name:'Public'})
         '''
         api.session.run(cquery)
-
     create_public_attr()
 
     # Create users and assign roles
-    api.create_user('Howard', 'Yanxon', 'hg.yanxon@gmail.com', 'orcid')
+    api.create_user('Howard', 'Yanxon', 'hg.yanxon@gmail.com', '123-456-789-0')     # uuid: u_HYanxon00001
     api.add_user_to_role('u_HYanxon00001','MLE Admin')
-    api.create_user('Elizabeth', 'Holman', 'liz@gmail.com', 'orcid')
+    api.create_user('Elizabeth', 'Holman', 'liz@gmail.com', '987-123-456-0')        # uuid: u_EHolman00002
     api.add_user_to_role('u_EHolman00002','MLE Admin')
-    api.create_user('Hari', 'Krish', 'krish@gmail.com', 'orcid')
+    api.create_user('Hari', 'Krish', 'krish@gmail.com', '345-671-289-0')            # uuid: u_HKrish00003
     api.add_user_to_role('u_HKrish00003','Admin')
-    api.create_user('John', 'Smith', 'smithj123@gmail.com', 'orcid')
+    api.create_user('John', 'Smith', 'smithj123@gmail.com', '333-444-555-1')        # uuid: u_JSmith00004
+    api.add_user_to_role('u_JSmith00004', 'MLE User')
 
     # Add compute location
-    api.create_compute(name='Aardvark', hostname='aardvark.anl.gov', public=False, uuid='u_HKrish00003')
     api.create_compute(name='MLSandbox', hostname='mlsandbox.als.lbl.gov')
-    api.create_compute(name='Vaughan', hostname='vaughan.als.lbl.gov')
-    api.create_compute(name='NERSC-Perlmutter', hostname='perlmutter.nersc.gov')
+    #api.create_compute(name='Aardvark', hostname='aardvark.anl.gov', public=False, uuid='u_HKrish00003')
+    #api.create_compute(name='Vaughan', hostname='vaughan.als.lbl.gov')
+    #api.create_compute(name='NERSC-Perlmutter', hostname='perlmutter.nersc.gov')
     api.add_user_to_compute(uuid='u_EHolman00002', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
     api.add_user_to_compute(uuid='u_JSmith00004', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
     api.remove_user_from_compute(uuid='u_EHolman00002', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
@@ -776,9 +1170,26 @@ if __name__ == '__main__':
     # Create user assets
     api.create_user_asset(name='UAsset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
     api.create_user_asset(name='UAsset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
-    ### Add two policies over which to check for permission.
-    api.test_policy1()
-    api.test_policy2()
+    
+    # Create a Policy
+    api.create_new_policy(subject_dict={'Team': ('name', 'MLExchange_Team')}, 
+                          object_dict={'content': ('name', 'CAsset_00002')}, 
+                          action='Read', 
+                          policy_owner='u_HKrish00003',
+                          policy_name='TestPolicy')
+
+    #api.add_subject_to_policy(subject_dict={'user': ('uuid', 'u_JSmith00004')}, policy_owner='u_HKrish00003', policy_name='TestPolicy')
+    #api.remove_subject_from_policy(subject_dict={'user': ('uuid', 'u_JSmith00004')}, policy_owner='u_HKrish00003', policy_name='TestPolicy')
+
+    #api.add_object_to_policy(object_dict={'UserAsset': ('name', 'UAsset_00001')}, policy_owner='u_HKrish00003', policy_name='TestPolicy')
+    #api.remove_object_from_policy(object_dict={'UserAsset': ('name', 'UAsset_00001')}, policy_owner='u_HKrish00003', policy_name='TestPolicy')
+
+
+    # Delete a policy
+    #api.delete_policy(policy_owner='u_HKrish00003', policy_name='TestPolicy')
+    
+    # Change policy action
+    #api.change_action_policy(action='Read', policy_owner='u_HKrish00003', policy_name='TestPolicy')
 
     ### Check for blocking of node duplication on create_user_asset.
     #['u_HYanxon00001', 'u_EHolman00002', 'u_HKrish00003', 'u_JSmith00004']
@@ -790,58 +1201,58 @@ if __name__ == '__main__':
     
     # Check access of Smith (Unapproved) to Write to Content
     # take account of owner!!!
-    SmithWriteplaceholdcuid = {"SUBJECT_NAME_UID": "u_JSmith00004","OBJECT_NAME_UID": "placeholdcuid", "ACTION_NAME":"Write"}
-    cypher_query = '''
-    with $SmithWriteplaceholdcuid as req
-    // Stage 1 - Subject Conditions
-    match (sub:Subject {name:req.SUBJECT_NAME_UID})-[:HAS_ATTR*0..5]->(sc)-[:SUB_CON]->(pol:Policy)
-    with req, pol, size(collect(distinct sc)) as sat_cons
-    match (pol)<-[:SUB_CON]-(rc)
-    with req, pol, sat_cons, size(collect(rc)) as req_cons where req_cons = sat_cons
+    #   SmithWriteplaceholdcuid = {"SUBJECT_NAME_UID": "u_JSmith00004","OBJECT_NAME_UID": "placeholdcuid", "ACTION_NAME":"Write"}
+    #   cypher_query = '''
+    #   with $SmithWriteplaceholdcuid as req
+    #   // Stage 1 - Subject Conditions
+    #   match (sub:Subject {name:req.SUBJECT_NAME_UID})-[:HAS_ATTR*0..5]->(sc)-[:SUB_CON]->(pol:Policy)
+    #   with req, pol, size(collect(distinct sc)) as sat_cons
+    #   match (pol)<-[:SUB_CON]-(rc)
+    #   with req, pol, sat_cons, size(collect(rc)) as req_cons where req_cons = sat_cons
 
-    // Stage 2 - Object Conditions
-    match (obj:Object {name:req.OBJECT_NAME_UID})-[:HAS_ATTR*0..5]->(sc)-[:OBJ_CON]->(pol) 
-    with req, pol, size(collect(distinct sc)) as sat_cons
-    match (pol)<-[:OBJ_CON]-(rc)
-    with req, pol, sat_cons, size(collect(rc)) as req_cons where req_cons = sat_cons
+    #   // Stage 2 - Object Conditions
+    #   match (obj:Object {name:req.OBJECT_NAME_UID})-[:HAS_ATTR*0..5]->(sc)-[:OBJ_CON]->(pol) 
+    #   with req, pol, size(collect(distinct sc)) as sat_cons
+    #   match (pol)<-[:OBJ_CON]-(rc)
+    #   with req, pol, sat_cons, size(collect(rc)) as req_cons where req_cons = sat_cons
 
-    // Stage 3 - Action Conditions
-    match (act:Action {name:req.ACTION_NAME})-[:HAS_ATTR*0..5]->(sc)-[:ACT_CON]->(pol) 
-    with req, pol, size(collect(distinct sc)) as sat_cons
-    match (pol)<-[:ACT_CON]-(rc)
-    with req, pol, sat_cons, size(collect(rc)) as req_cons where req_cons = sat_cons 
-    return case when count(pol) = 0 or 'Deny' in collect(pol.decision) then 'Deny' else 'Permit' end as decision
-    '''
-    results = api.session.run(cypher_query, SmithWriteplaceholdcuid=SmithWriteplaceholdcuid).data()
-    print(results)
-    
-    # Create placeholder auth information for testini user and testAdmin nodes.
-    def create_auth_node(email:str, password:str):
-        parameters = {'email':email, 'password':password}
-        c_query = '''
-        MATCH (u:user)-[:owner_of]->(up:UserProfile {email:$email})
-        MERGE (n:AuthUser {email:$email, password:$password})<-[:owner_of]-(u)
-        RETURN n
-        '''
-        status = api.session.run(c_query, parameters=parameters)
-        return status
-    
-    # test login page processing with placeholder auth
-    api.create_user("Test", "Initial", "testini@test.com", "orcid00001")
-    api.add_user_to_role(uuid='u_TInitial00005', role="MLE User")
-    api.add_user_to_team(uuid='u_TInitial00005', tname='random team', towner='u_HKrish00003')
-    api.add_user_to_compute(uuid='u_TInitial00005', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
-    api.add_user_to_compute(uuid='u_TInitial00005', cname='NERSC-Perlmutter', chostname='perlmutter.nersc.gov')
-    api.create_team(name='Testini Realm', owner='u_TInitial00005')
-    api.create_user("Test", "Admin", "testeradmin@admin.gov", "orcid00002")
-    api.add_user_to_role(uuid='u_TAdmin00006', role="Admin")
-    create_auth_node(email='testini@test.com', password='mleuser')
-    create_auth_node(email='testeradmin@admin.gov', password='admin')
+    #   // Stage 3 - Action Conditions
+    #   match (act:Action {name:req.ACTION_NAME})-[:HAS_ATTR*0..5]->(sc)-[:ACT_CON]->(pol) 
+    #   with req, pol, size(collect(distinct sc)) as sat_cons
+    #   match (pol)<-[:ACT_CON]-(rc)
+    #   with req, pol, sat_cons, size(collect(rc)) as req_cons where req_cons = sat_cons 
+    #   return case when count(pol) = 0 or 'Deny' in collect(pol.decision) then 'Deny' else 'Permit' end as decision
+    #   '''
+    #   results = api.session.run(cypher_query, SmithWriteplaceholdcuid=SmithWriteplaceholdcuid).data()
+    #   print(results)
+    #   
+    #   # Create placeholder auth information for testini user and testAdmin nodes.
+    #   def create_auth_node(email:str, password:str):
+    #       parameters = {'email':email, 'password':password}
+    #       c_query = '''
+    #       MATCH (u:user)-[:owner_of]->(up:UserProfile {email:$email})
+    #       MERGE (n:AuthUser {email:$email, password:$password})<-[:owner_of]-(u)
+    #       RETURN n
+    #       '''
+    #       status = api.session.run(c_query, parameters=parameters)
+    #       return status
+    #   
+    #   # test login page processing with placeholder auth
+    #   api.create_user("Test", "Initial", "testini@test.com", "orcid00001")
+    #   api.add_user_to_role(uuid='u_TInitial00005', role="MLE User")
+    #   api.add_user_to_team(uuid='u_TInitial00005', tname='random team', towner='u_HKrish00003')
+    #   api.add_user_to_compute(uuid='u_TInitial00005', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
+    #   api.add_user_to_compute(uuid='u_TInitial00005', cname='NERSC-Perlmutter', chostname='perlmutter.nersc.gov')
+    #   api.create_team(name='Testini Realm', owner='u_TInitial00005')
+    #   api.create_user("Test", "Admin", "testeradmin@admin.gov", "orcid00002")
+    #   api.add_user_to_role(uuid='u_TAdmin00006', role="Admin")
+    #   create_auth_node(email='testini@test.com', password='mleuser')
+    #   create_auth_node(email='testeradmin@admin.gov', password='admin')
 
-    #test get_teams_for_user()
-    api.get_teams_for_user('u_TInitial00005')
-    api.get_uuid_from_email(email='hg.yanxon@gmail.com')
-    api.get_members_for_team('Testini Realm', 'u_TInitial00005')
+    #   #test get_teams_for_user()
+    #   api.get_teams_for_user('u_TInitial00005')
+    #   api.get_uuid_from_email(email='hg.yanxon@gmail.com')
+    #   api.get_members_for_team('Testini Realm', 'u_TInitial00005')
 
     # Close session
     api.driver.close()

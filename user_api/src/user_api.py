@@ -218,8 +218,7 @@ def get_all_teams():
     return teams
 
 @app.get(API_URL_PREFIX + "/users/", tags=['users'])
-def get_users(first_name:Optional[str]=None, last_name:Optional[str]=None, uuid:Optional[str]=None, email:Optional[str]=None):
+def get_users(user_id:str, first_name:Optional[str]=None, last_name:Optional[str]=None, uuid:Optional[str]=None, email:Optional[str]=None):
     kv = {'fname': first_name, 'lname': last_name, 'uuid': uuid, 'email': email}
-    users = api.get_users(kv)
+    users = api.get_users(kv, requestor=user_id)
     return users
-
