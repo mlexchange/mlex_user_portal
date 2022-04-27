@@ -266,10 +266,7 @@ layout = html.Div(
                         dbc.CardBody([
                             html.Div(
                                 html.H1("Welcome back, " + str(fname) + " " + str(lname) + "!"),
-                                style={"width":"100%", "textAlign":"left", "vertical-align":"bottom"}),
-                            # html.Div(
-                            #     "We suggest navigating through the MLExchange Platform with at least a 720p browser window.",
-                            #     style={"width":"100%", "textAlign":"left", "font-style":"italic"})
+                                style={"width":"100%", "textAlign":"left", "vertical-align":"bottom"})
                         ])
                     )
                 )
@@ -373,9 +370,9 @@ def create_team(n, tname):
         return "", "test"
     if "new-team" in changed_id:
         requests.post(url)
-        return "", "New team has been registered!"
+        return "", "New team has been registered!",
     else:
-        return ""
+        return "", ""
 
 @app.callback(
     Output("del-team-output", "children"),
@@ -395,7 +392,7 @@ def delete_team(n, tname):
         msg = "Team " + str(tname) + " has been deleted."
         return "", msg
     else:
-        return ""
+        return "", ""
 
 @app.callback(
     Output("add-mem-output", "children"),
@@ -416,7 +413,7 @@ def add_to_team(n, email, tname):
         requests.post(url)
         return "", "New member has been added!"
     else:
-        return ""
+        return "", ""
 
 @app.callback(
     Output("rem-mem-output", "children"),
@@ -437,7 +434,7 @@ def rem_from_team(n, email, tname):
         requests.delete(url)
         return "", "Member has been removed."
     else:
-        return ""
+        return "", ""
 
 @app.callback(
     Output('mem-team-table', 'data'),
