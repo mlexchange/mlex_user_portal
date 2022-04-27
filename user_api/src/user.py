@@ -370,9 +370,9 @@ class userAPI:
             status = print("[WARNING] User asset was not created.")
         return status
     
-    def create_content_asset(self, name:str, owner:str, type:str, cuid:str, public=False):
+    def create_content_asset(self, name:str, owner:str, type:str, cuid:str, public=False, active=True):
         ''' Registers creation of new assets from content registry. Transaction-locked query.'''
-        parameters = {'name': name, 'owner': owner, 'type': type, 'cuid':cuid}
+        parameters = {'name': name, 'owner': owner, 'type': type, 'cuid':cuid, 'active':active}
         if public:
             cquery = '''
             CALL {
@@ -388,7 +388,7 @@ class userAPI:
 
             WITH value.result as ca_uid
             MATCH (u:user {uuid: $owner}), (ca:content {cuid:ca_uid}), (pub:Public {name:'Public'})
-            SET ca.name = $name, ca.owner = $owner, ca.type = $type
+            SET ca.name = $name, ca.owner = $owner, ca.type = $type, ca.active = $active
             CREATE (u)-[:owner_of]->(ca)-[:has_attr]->(pub)            
             RETURN ca.cuid as cauid
             '''
@@ -412,7 +412,7 @@ class userAPI:
             WITH value.result as ca_uid
             MATCH (u:user {uuid: $owner}), (ca:content {cuid:ca_uid})
             CREATE (u)-[:owner_of]->(ca)
-            SET ca.name = $name, ca.owner = $owner, ca.type = $type
+            SET ca.name = $name, ca.owner = $owner, ca.type = $type, ca.active = $active
             RETURN ca.cuid as cauid
             '''
             ca_uid = self.session.run(cquery, parameters=parameters).data()
@@ -444,14 +444,14 @@ class userAPI:
         return status
     
     def delete_content_asset(self, cuid=None):
-        """ Deletes content asset from graph database. Function for Compute API, owner, and admin. """
+        """ Archives content asset from graph database. Function for Compute API, owner, and admin. """
         if cuid:
             parameters = {'cuid':cuid}
             cquery = '''
             MATCH (ca:content {cuid:$cuid})
             WITH count(ca) AS counts
             CALL apoc.do.when(counts > 0,
-                'MATCH (c:content {cuid:$c_uid}) DETACH DELETE (c) RETURN toInteger(1) AS result',
+                'MATCH (c:content {cuid:$c_uid}) SET c.active = False RETURN toInteger(1) AS result',
                 'RETURN toInteger(0) AS result',
                 {counts:counts, c_uid:$cuid}) YIELD value
             RETURN value.result as result
@@ -524,7 +524,7 @@ class userAPI:
 
     def get_all_assets(self):
         cquery = '''
-        MATCH (ca:content)
+        MATCH (ca:content {active:True})
         RETURN ca AS asset
         UNION ALL
         MATCH (ua:UserAsset)
@@ -533,16 +533,17 @@ class userAPI:
         status = self.session.run(cquery).data()
         return [s['asset'] for s in status]
 
-    # def get_assets_for_user(self, uuid:str):
-    #     cquery = '''
-    #     MATCH (ca:content)
-    #     RETURN ca AS asset
-    #     UNION ALL
-    #     MATCH (ua:UserAsset)
-    #     RETURN ua AS asset
-    #     '''
-    #     status = self.session.run(cquery).data()
-    #     return [s['asset'] for s in status]
+    def get_assets_for_user(self, uuid:str):
+        parameters = {'uuid':uuid}
+        cquery = '''
+        MATCH (ca:content {active:True})
+        RETURN ca AS asset
+        UNION ALL
+        MATCH (ua:UserAsset {owner:$uuid})
+        RETURN ua AS asset
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        return [s['asset'] for s in status]
 
     def get_all_roles(self):
         cquery = '''
@@ -624,7 +625,7 @@ class userAPI:
         RETURN u.uuid AS uuid
         '''
         uuid = self.session.run(cquery, parameters=parameters).data()[0]['uuid']
-        print(uuid)
+        #print(uuid)
         return uuid
 
     def get_users(self, key_value):

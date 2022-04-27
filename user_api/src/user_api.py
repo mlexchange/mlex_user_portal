@@ -207,6 +207,11 @@ def get_compute_for_user(user_id:str):
     compute = api.get_compute_for_user(uuid=user_id)
     return compute
 
+@app.get(API_URL_PREFIX + "/users/{user_id}/content/userassets/", tags=['users','content','userassets'])
+def get_assets_for_user(user_id):
+    assets = api.get_assets_for_user(user_id)
+    return assets
+
 @app.get(API_URL_PREFIX + "/teams/", tags=['teams'])
 def get_all_teams():
     teams = api.get_all_teams()
