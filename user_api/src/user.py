@@ -564,7 +564,7 @@ class userAPI:
         """ Get all compute locations that a single user can access. """
         parameters = {'uuid':uuid}
         cquery = '''
-        match (comp:Compute)<-[:user_of]-(u:user {uuid:$uuid})
+        match (comp:Compute)<-[rel:user_of]-(u:user {uuid:$uuid})
         return comp
         '''
         status = self.session.run(cquery, parameters=parameters).data()
@@ -624,10 +624,6 @@ class userAPI:
         RETURN u.uuid AS uuid
         '''
         uuid = self.session.run(cquery, parameters=parameters).data()[0]['uuid']
-<<<<<<< HEAD
-        #print(uuid)
-=======
->>>>>>> main
         return uuid
 
     def get_users(self, key_value, requestor):
