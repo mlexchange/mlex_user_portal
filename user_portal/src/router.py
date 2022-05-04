@@ -18,7 +18,10 @@ default_layout = [dbc.Row([
 
 loggedin_layout = [dbc.Row([
     html.Div(dcc.Link('Home', href='/mlex_userhome'), style={'width':'60px', 'display':'inline-block'}),
-    html.Div(dcc.Link('Logout', href='/mlex_logout'), style={'width':'80px', 'display':'inline-block'})])]
+    html.Div(dcc.Link('Search', href='/mlex_search'), style={'width':'80px', 'display':'inline-block'}),
+    html.Div(dcc.Link('Compute', href='/mlex_compute'), style={'width':'85px', 'display':'inline-block'}),
+    html.Div(dcc.Link('Content', href='/mlex_content'), style={'width':'80px', 'display':'inline-block'}),
+    html.Div(dcc.Link('Logout', href='/mlex_logout'), style={'width':'70px', 'display':'inline-block'})])]
 
 pagelogin_layout = [dbc.Row([
     html.Div(dcc.Link('About', href='/mlex_about'), style={'width':'60px', 'display':'inline-block'}),
@@ -95,6 +98,12 @@ def display_page(pathname):
         return mlex_userhome.layout, loggedin_layout
     if pathname == "/mlex_logout":
         return mlex_logout.layout, default_layout
+    if pathname == "/mlex_search":
+        return html.Iframe("https://search.mlexchange.lbl.gov"), loggedin_layout
+    if pathname == "/mlex_content":
+        return html.Iframe("https://content.mlexchange.lbl.gov"), loggedin_layout
+    if pathname == "/mlex_compute":
+        return html.Iframe("https://compute.mlexchange.lbl.gov"), loggedin_layout
     else:
         return mlex_about.layout, default_layout
 
@@ -102,7 +111,7 @@ def display_page(pathname):
 # for testing interface
 if __name__ == "__main__":
     app.run_server(
-        debug=True,
-        dev_tools_ui=True,
-        dev_tools_props_check=True,
+        debug=False,
+        dev_tools_ui=False,
+        dev_tools_props_check=False,
         host='0.0.0.0')
