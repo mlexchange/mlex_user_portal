@@ -6,8 +6,8 @@ from dashapp import app
 import requests
 
 #--------------------------------------- App Layout Preparation ---------------------------------
-access_token = {'fname':'Test',
-                'lname':'Initial',
+access_token = {'fname':'Mel',
+                'lname':'Exchange',
                 'user_id':'u_TInitial00005'}
 
 fname = access_token.get('fname')
@@ -59,6 +59,8 @@ compute_table = html.Div(
         )
     ],
 style={'width':'100%', 'margin-top':'10px', 'margin-bottom':'10px'})
+
+# Create compute_management container
 
 # Create manage_team container
 team_manage_url = "http://user-api:5000/api/v0/users/" + str(user_id) + "/teams/owned"
@@ -126,10 +128,17 @@ t_members_layout = dbc.Collapse(
                     "Type in the name of your team below to view its membership.",
                     style={"width":"100%", "margin-bottom":"10px"}),
                 dbc.Container([
-                    dbc.Row(dbc.InputGroup([
-                        dbc.InputGroupText("Owned Team: "),
-                        dbc.Input(id="view-tname", placeholder="Name of Owned Team")],
-                    className="mb-3")),
+                    dbc.Row(
+                        dcc.Dropdown(
+                            id = 'dd-owned-team',
+                            options = [],
+                            searchable=False
+                        )
+                        # dbc.InputGroup([
+                        #     dbc.InputGroupText("Owned Team: "),
+                        #     dbc.Input(id="view-tname", placeholder="Name of Owned Team")],
+                        # className="mb-3")
+                    ),
                     dbc.Row(dbc.Col(dbc.Button(
                         "View",
                         outline=True,
@@ -300,12 +309,19 @@ layout = html.Div(
                                 dbc.CardHeader(html.H3("Computing Resources", style={"textAlign":"center"})),
                                 dbc.CardBody([
                                     html.Div(
-                                        "Please check the list of documented computing locations prior to submitting a request for a new " +
-                                        "computing location to be added to the database. Your accessible computing resources are listed below.",
+                                        "Your owned and accessible computing resources are listed below.",
                                         style={"width":"100%", "textAlign":"left"}),
                                     dbc.Row(compute_table),
+                                    dbc.Row([
+                                        dbc.Col(
+
+                                        ),
+                                        dbc.Col()
+                                    ]),
                                     html.Div(
-                                        "To add a private computing location to the database for your teams, please visit the Compute tab.",
+                                        "Please check the list of documented computing locations prior to submitting a request for a new " +
+                                        "computing location to be added to the database. To add a private computing location to the database" +
+                                        " for your teams, please visit the Compute tab.",
                                         style={"width":"100%", "textAlign":"left"}),
                                     html.Div(
                                         dbc.InputGroup([
@@ -435,6 +451,15 @@ def rem_from_team(n, email, tname):
         return "", "Member has been removed."
     else:
         return "", ""
+
+@app.callback(
+    Output("dd-owned-team-output", "options"),
+    Input("dd-owned-team", "value"),
+    prevent_initial_call=True
+)
+
+def update_output_dd_owned_team(value):
+    return f'You have selected Team {value}.'
 
 @app.callback(
     Output('mem-team-table', 'data'),
