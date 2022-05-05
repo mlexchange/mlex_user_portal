@@ -21,9 +21,13 @@ layout = html.Div(
                 dbc.Row(
                     dbc.Card(
                         children=[
-                            dbc.CardHeader(html.Div(
-                                "Insert MLExchange Mission Statement here.", style={"textAlign":"center"}
-                            ))
+                            dbc.CardHeader(
+                                html.Img(
+                                    id="figure1",
+                                    src='assets/mlex_intro.png',
+                                    height="300px"
+                                ),
+                                md="auto", style={"textAlign":"center"})
                         ]
                     )
                 )
