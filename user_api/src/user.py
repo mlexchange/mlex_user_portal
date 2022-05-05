@@ -586,7 +586,7 @@ class userAPI:
             RETURN t.name AS tname
             '''
             teams_list = self.session.run(cquery,parameters=parameters).data()
-            return [t['tname'] for t in teams_list]
+            return teams_list
         else:
             cquery = '''
             MATCH (u:user {uuid:$uuid})-[rel:has_attr]->(t:Team)<-[own_01:owner_of]-(u_01:user)-[own_02:owner_of]->(up:UserProfile)
