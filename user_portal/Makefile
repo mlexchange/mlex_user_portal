@@ -1,5 +1,5 @@
 TAG 			:= latest	
-USER 			:= aasgreen
+USER 			:= eaholman
 PROJECT			:= user_portal
 
 IMG_WEB_SVC    			:= ${USER}/${PROJECT}:${TAG}
