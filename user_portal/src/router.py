@@ -6,10 +6,10 @@ import requests
 from dashapp import app
 import mlex_registration
 import mlex_login
-import mlex_userhome 
+import mlex_userhome
 import mlex_about
 import mlex_logout
-# from mlex_adminhome import layout
+# import mlex_adminhome
 
 
 default_layout = [dbc.Row([

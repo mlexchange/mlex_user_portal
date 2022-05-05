@@ -17,20 +17,27 @@ layout = html.Div(
                     )
                 )
             ]),
-            dbc.Container(
+            dbc.Container([
+                dbc.Row(
+                    html.Img(
+                        id="figure1",
+                        src='assets/mlex_intro.png',
+                        style = {'height':"282px", 'width':"512px"}),
+                    justify="center"
+                ),
                 dbc.Row(
                     dbc.Card(
                         children=[
-                            dbc.CardHeader(
-                                html.Img(
-                                    id="figure1",
-                                    src='assets/mlex_intro.png',
-                                    height="300px"
-                                ),
-                                md="auto", style={"textAlign":"center"})
+                            dbc.CardHeader(html.Div(html.H4("Overview"))),
+                            dbc.CardBody("MLExchange is an open source platform that deploys machine learning " +
+                            "(ML) models for beamline scientists,  which will act as a shared repository, " +
+                            "populated with community algorithms, models, and datasets. This platform is under " +
+                            "collaborative developments across Argonne National Laboratory (ANL), Brookhaven " +
+                            "National Laboratory (BNL), Lawrence Berkeley National Laboratory (LBNL), Oak Ridge " + 
+                            "National Laboratory (ORNL), and SLAC National Accelerator Laboratory (SLAC).")
                         ]
                     )
-                )
+                )]
             )
         ]
     , id="about_layout")

@@ -1,6 +1,5 @@
 from dash import Dash, callback, callback_context, html, dcc, dash_table, Input, Output, State, MATCH, ALL
 import dash_bootstrap_components as dbc
-import pandas as pd
 
 from dashapp import app
 import requests
@@ -118,6 +117,11 @@ t_team_layout = dbc.Collapse(
 )
 
 # Create manage_members container
+owned_teams_url = "http://user-api:5000/api/v0/users/" + str(user_id) + "/teams/owned"
+owned_teams = []
+for entry in requests.get(owned_teams_url).json():
+    owned_teams.append(entry['tname'])
+
 t_members_layout = dbc.Collapse(
     id='t-members-tab',
     children=[
@@ -131,20 +135,21 @@ t_members_layout = dbc.Collapse(
                     dbc.Row(
                         dcc.Dropdown(
                             id = 'dd-owned-team',
-                            options = [],
-                            searchable=False
+                            options = owned_teams,
+                            searchable = False
                         )
                         # dbc.InputGroup([
                         #     dbc.InputGroupText("Owned Team: "),
                         #     dbc.Input(id="view-tname", placeholder="Name of Owned Team")],
                         # className="mb-3")
                     ),
+                    html.Div(id='dd-owned-team-output'),
                     dbc.Row(dbc.Col(dbc.Button(
                         "View",
                         outline=True,
                         color="primary",
                         id="view-team",
-                        style={"text-transform": "none", "width":"100%", "margin-bottom":"10px"})),
+                        style={"text-transform": "none", "width":"100%", "margin-bottom":"10px", "margin-top":"10px"})),
                     align="center")]),
                     ]),
             dbc.Col(
@@ -187,7 +192,7 @@ t_members_layout = dbc.Collapse(
             dbc.Row(
                 dbc.InputGroup([
                     dbc.InputGroupText("New Member's Email Address: "),
-                    dbc.Input(id="add-member-email", placeholder="exampleaddress@domain.com")],
+                    dbc.Input(id="add-member-email", placeholder="Email Address - example_address@domain.com")],
                 className="mb-3")
             ),
             dbc.Row(
@@ -211,7 +216,7 @@ t_members_layout = dbc.Collapse(
             dbc.Row(
                 dbc.InputGroup([
                     dbc.InputGroupText("Current Member's Email Address: "),
-                    dbc.Input(id="rem-member-email", placeholder="Confirm Email Address")],
+                    dbc.Input(id="rem-member-email", placeholder="Email Address - example_address@domain.com")],
                 className="mb-3")
             ),
             dbc.Row(
@@ -330,7 +335,7 @@ layout = html.Div(
                                                 outline=True,
                                                 color="primary",
                                                 id="new",
-                                                #href="/mlex_compute",
+                                                href="/mlex_compute",
                                                 style={"text-transform": "none", "width":"100%"}), align="center")
                                         ]),
                                     style={'width':'100%', 'margin-top':'10px'})
@@ -452,14 +457,14 @@ def rem_from_team(n, email, tname):
     else:
         return "", ""
 
-@app.callback(
-    Output("dd-owned-team-output", "options"),
-    Input("dd-owned-team", "value"),
-    prevent_initial_call=True
-)
+# @app.callback(
+#     Output("dd-owned-team-output", "children"),
+#     Input("dd-owned-team", "value"),
+#     prevent_initial_call=True
+# )
 
-def update_output_dd_owned_team(value):
-    return f'You have selected Team {value}.'
+# def update_output_dd_owned_team(value):
+#     return f'You have selected Team {value}.'
 
 @app.callback(
     Output('mem-team-table', 'data'),
