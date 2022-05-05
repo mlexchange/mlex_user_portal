@@ -2,6 +2,8 @@ version: "3.9"
 
 services:
   front-end:
+    depends_on:
+      - user-api
     restart: "unless-stopped"
     container_name: "user-portal"
     build:
@@ -12,6 +14,8 @@ services:
       - "./user_portal/src:/app/work/src"
     ports:
       - '8050:8050'
+    environment:
+      - USER_API=user-api
 
   user-api:
       restart: "unless-stopped"

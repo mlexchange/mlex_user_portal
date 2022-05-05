@@ -1,8 +1,11 @@
 FROM python:3.9
 MAINTAINER THE MLEXCHANGE TEAM
 
-RUN ls
-COPY docker/requirements.txt requirements.txt
+WORKDIR /app/work
+
+COPY docker/requirements.txt ./requirements.txt
+COPY docker/wait-for-it.sh ./wait-for-it.sh
+COPY docker/docker-entrypoint.sh ./docker-entrypoint.sh
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -14,9 +17,9 @@ RUN apt-get update && apt-get install -y \
     python3-tk
 
 RUN pip3 install --upgrade pip &&\
-    pip3 install -r requirements.txt 
+    pip3 install -r requirements.txt
 
-WORKDIR /app/work
 ENV HOME /app/work
 ENV PYTHONUNBUFFERED=1
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["bash"]
