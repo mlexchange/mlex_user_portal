@@ -133,15 +133,15 @@ t_members_layout = dbc.Collapse(
                     style={"width":"100%", "margin-bottom":"10px"}),
                 dbc.Container([
                     dbc.Row(
-                        dcc.Dropdown(
-                            id = 'dd-owned-team',
-                            options = owned_teams,
-                            searchable = False
-                        )
-                        # dbc.InputGroup([
-                        #     dbc.InputGroupText("Owned Team: "),
-                        #     dbc.Input(id="view-tname", placeholder="Name of Owned Team")],
-                        # className="mb-3")
+                        # dcc.Dropdown(
+                        #     id = 'dd-owned-team',
+                        #     options = owned_teams,
+                        #     searchable = False
+                        # )
+                        dbc.InputGroup([
+                            dbc.InputGroupText("Owned Team: "),
+                            dbc.Input(id="view-tname", placeholder="Name of Owned Team")],
+                        className="mb-3")
                     ),
                     html.Div(id='dd-owned-team-output'),
                     dbc.Row(dbc.Col(dbc.Button(
