@@ -1,7 +1,3 @@
-#placeholder file for Hari's login page
-
-import json
-from urllib import response
 from dash import Dash, callback_context, html, dcc, Input, Output, State
 import dash_bootstrap_components as dbc
 

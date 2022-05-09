@@ -40,7 +40,8 @@ compute_table = html.Div(
             id='compute-table',
             columns=[
                 {'name':'Name', 'id':'name'},
-                {'name':'Hostname', 'id':'hostname'}
+                {'name':'Hostname', 'id':'hostname'},
+                {'name': 'Role', 'id':'role'}
             ],
             data=requests.get(compute_url).json(),
             fixed_rows={'headers':True},
@@ -52,14 +53,135 @@ compute_table = html.Div(
                 {
                     "if": {"state": "selected"},
                     "backgroundColor": "inherit !important",
-                    "border": "inherit !important",
+                    "border": "inherit !important"
                 }
             ]
         )
     ],
 style={'width':'100%', 'margin-top':'10px', 'margin-bottom':'10px'})
 
-# Create compute_management container
+# Create users with compute resource access container
+cr_members = dbc.Collapse(
+                    id='view-cr-table',
+                    children = [
+                        dash_table.DataTable(
+                            id='cr-mem-table',
+                            columns=[
+                                {'name':'Hostname', 'id':'hostname'},
+                                {'name':'Role', 'id':'role'},
+                                {'name':'Email Address', 'id':'email'},
+                                {'name': 'Name', 'id':'fname'},
+                                {'name':'', 'id':'lname'}
+                            ],
+                            data=[],
+                            hidden_columns=[], #currently empty
+                            fixed_rows={'headers':True},
+                            css=[{"selector": ".show-hide", "rule": "display: none"}],
+                            style_table={'overflowY': 'auto', 'overflowX': 'scroll'},
+                            style_cell={'font_family':'arial', 'textAlign':'center'},
+                            style_header={'fontWeight':'bold'},
+                            style_data_conditional=[
+                                {
+                                    "if": {"state": "selected"},
+                                    "backgroundColor": "inherit !important",
+                                    "border": "inherit !important",
+                                }
+                            ]
+                        )
+                    ],
+style={"width":"100%"})
+
+# Create compute access management container
+cr_manage_layout = dbc.Collapse(
+    id='cr-access-manage',
+    children=[
+        html.Div(html.H3("Compute Resource Access Management"), style={'textAlign':'center', "margin-top":"10px"}),
+        html.Div(
+            "Type in the name of your compute resource below to view those who have access to it." +
+            " Note that inputs are case-sensitive.",
+            style={"width":"100%", "margin-bottom":"10px"}),
+        dbc.Container([
+            dbc.Row(
+                dbc.InputGroup([
+                    dbc.InputGroupText("Computing Resource: "),
+                    dbc.Input(id="view-cr-hostname", placeholder="Hostname of Resource")],
+                className="mb-3")
+            ),
+            dbc.Row(dbc.Col(dbc.Button(
+                "View",
+                outline=True,
+                color="primary",
+                id="view-cr",
+                style={"text-transform": "none", "width":"100%", "margin-bottom":"10px"})),
+            align="center"),
+            html.Div(cr_members)],
+        style={"width":"100%"}),
+        dbc.Row([
+            dbc.Col([
+                html.Div(html.H4("Add User to Compute Resource"),
+                    style={"width":"100%", "margin-top":"10px", 'textAlign':'center'}),
+                html.Div(
+                    "To add a new user to a compute resource that either you own or manage, please input the user's " +
+                    "email address and compute resource's hostname in the form below.",
+                style={"width":"100%", "margin-top":"10px", "margin-bottom":"10px"}),
+                dbc.Container([
+                    dbc.Row(
+                        dbc.InputGroup([
+                            dbc.InputGroupText("New Member's Email Address: "),
+                            dbc.Input(id="add-user-email", placeholder="Email Address - example_address@domain.com")],
+                        className="mb-3")
+                    ),
+                    dbc.Row(
+                        dbc.InputGroup([
+                            dbc.InputGroupText("Hostname of Compute Resource: "),
+                            dbc.Input(id="add-user-hostname", placeholder="Hostname")],
+                        className="mb-3")
+                    ),
+                    dbc.Row(
+                        dbc.Button(
+                            "Grant Access",
+                            outline=True,
+                            color="primary",
+                            id="add-to-cr",
+                            style={"text-transform": "none", "width":"100%", "margin-top":"10px", "margin-bottom":"10px"}),
+                    align="center"),
+                    dbc.Row(html.Div(id='add-user-output', style={"width":"100%", "textAlign":"center"}))
+                ])
+            ]),
+            dbc.Col([
+                html.Div(html.H4("Remove User from Compute Resource"),
+                    style={"width":"100%", "margin-top":"10px", 'textAlign':'center'}),
+                html.Div(
+                    "To remove a new user from a compute resource that either you own or manage, please input the user's " +
+                    "email address and compute resource's hostname in the form below.",
+                style={"width":"100%", "margin-top":"10px", "margin-bottom":"10px"}),
+                dbc.Container([
+                    dbc.Row(
+                        dbc.InputGroup([
+                            dbc.InputGroupText("Current User's Email Address: "),
+                            dbc.Input(id="rem-user-email", placeholder="Email Address - example_address@domain.com")],
+                        className="mb-3")
+                    ),
+                    dbc.Row(
+                        dbc.InputGroup([
+                            dbc.InputGroupText("Hostname of Compute Resource: "),
+                            dbc.Input(id="rem-user-hostname", placeholder="Hostname")],
+                        className="mb-3")
+                    ),
+                    dbc.Row(
+                        dbc.Button(
+                            "Remove Access",
+                            outline=True,
+                            color="primary",
+                            id="rem-from-cr",
+                            style={"text-transform": "none", "width":"100%", "margin-top":"10px", "margin-bottom":"10px"}),
+                    align="center"),
+                    dbc.Row(html.Div(id='rem-user-output', style={"width":"100%", "textAlign":"center"}))
+                ])
+            ])
+        ])
+    ]
+)
 
 # Create manage_team container
 team_manage_url = "http://user-api:5000/api/v0/users/" + str(user_id) + "/teams/owned"
@@ -117,10 +239,10 @@ t_team_layout = dbc.Collapse(
 )
 
 # Create manage_members container
-owned_teams_url = "http://user-api:5000/api/v0/users/" + str(user_id) + "/teams/owned"
-owned_teams = []
-for entry in requests.get(owned_teams_url).json():
-    owned_teams.append(entry['tname'])
+# owned_teams_url = "http://user-api:5000/api/v0/users/" + str(user_id) + "/teams/owned"
+# owned_teams = []
+# for entry in requests.get(owned_teams_url).json():
+#     owned_teams.append(entry['tname'])
 
 t_members_layout = dbc.Collapse(
     id='t-members-tab',
@@ -129,15 +251,11 @@ t_members_layout = dbc.Collapse(
         dbc.Row([
             dbc.Col([
                 html.Div(
-                    "Type in the name of your team below to view its membership.",
+                    "Type in the name of your team below to view its members. If table is" +
+                    " blank, please ask the team's owner or manager for management permissions.",
                     style={"width":"100%", "margin-bottom":"10px"}),
                 dbc.Container([
                     dbc.Row(
-                        # dcc.Dropdown(
-                        #     id = 'dd-owned-team',
-                        #     options = owned_teams,
-                        #     searchable = False
-                        # )
                         dbc.InputGroup([
                             dbc.InputGroupText("Owned Team: "),
                             dbc.Input(id="view-tname", placeholder="Name of Owned Team")],
@@ -149,7 +267,7 @@ t_members_layout = dbc.Collapse(
                         outline=True,
                         color="primary",
                         id="view-team",
-                        style={"text-transform": "none", "width":"100%", "margin-bottom":"10px", "margin-top":"10px"})),
+                        style={"text-transform": "none", "width":"100%", "margin-bottom":"10px"})),
                     align="center")]),
                     ]),
             dbc.Col(
@@ -159,10 +277,10 @@ t_members_layout = dbc.Collapse(
                         dash_table.DataTable(
                             id='mem-team-table',
                             columns=[
-                                {'name':'Name', 'id':'fname'},
-                                {'name':'', 'id':'lname'},
-                                {'name':'Email Address', 'id':'email'},
-                                {'name': 'Membership', 'id':'membership'}
+                                {'name':'First', 'id':'fname'},
+                                {'name':'Last', 'id':'lname'},
+                                {'name':'Email', 'id':'email'},
+                                {'name': 'Role', 'id':'membership'}
                             ],
                             data=[],
                             hidden_columns=['towner'],
@@ -273,80 +391,81 @@ memberships = dbc.Collapse(
 #--------------------------------------- App Layout ---------------------------------
 # Setting up initial webpage layout
 layout = html.Div(
-        [
-            dbc.Container([
-                dbc.Row(
-                    dbc.Card(
-                        dbc.CardBody([
-                            html.Div(
-                                html.H1("Welcome back, " + str(fname) + " " + str(lname) + "!"),
-                                style={"width":"100%", "textAlign":"left", "vertical-align":"bottom"})
-                        ])
-                    )
-                )
-            ]),
-            dbc.Container(
-                dbc.Row(
-                    [dbc.Col(
-                        dbc.Card(
-                            children=[
-                                dbc.CardHeader(html.H3("Team Memberships", style={"textAlign":"center"})),
-                                dbc.CardBody([
-                                    html.Div(
-                                        "This section exists to create project teams consisting of appropriate users who have registered and " +
-                                        "have been approved to use MLExchange resources. Please use the buttons below to navigate through team" + 
-                                        " creation and team membership management. Note that the goal of teams is to serve as a method of controlling" +
-                                        "  user access to owned assets relating to MLExchange.",
-                                        style={"width":"100%", "textAlign":"left"}),
-                                    dbc.Row(html.Div(memberships, style={'width':'100%', 'margin-top':'10px', 'margin-bottom':'10px'})),
-                                    dbc.Row(html.Div(team_input_groups, style={'width':'100%', 'margin-bottom':'10px'})),
-                                    dbc.Row([
-                                        html.Div(t_team_layout),
-                                        html.Div(t_members_layout)
-                                    ])
-                                ])
-                            ]
-                        )
-                    ),
-                    dbc.Col(
-                        dbc.Card(
-                            children=[
-                                dbc.CardHeader(html.H3("Computing Resources", style={"textAlign":"center"})),
-                                dbc.CardBody([
-                                    html.Div(
-                                        "Your owned and accessible computing resources are listed below.",
-                                        style={"width":"100%", "textAlign":"left"}),
-                                    dbc.Row(compute_table),
-                                    dbc.Row([
-                                        dbc.Col(
-
-                                        ),
-                                        dbc.Col()
-                                    ]),
-                                    html.Div(
-                                        "Please check the list of documented computing locations prior to submitting a request for a new " +
-                                        "computing location to be added to the database. To add a private computing location to the database" +
-                                        " for your teams, please visit the Compute tab.",
-                                        style={"width":"100%", "textAlign":"left"}),
-                                    html.Div(
-                                        dbc.InputGroup([
-                                            dbc.Col(dbc.Button(
-                                                "Add Computing Resource",
-                                                outline=True,
-                                                color="primary",
-                                                id="new",
-                                                href="/mlex_compute",
-                                                style={"text-transform": "none", "width":"100%"}), align="center")
-                                        ]),
-                                    style={'width':'100%', 'margin-top':'10px'})
-                                ])
-                            ]
-                        )
-                    )]
+    [
+        dbc.Container([
+            dbc.Row(
+                dbc.Card(
+                    dbc.CardBody([
+                        html.Div(
+                            html.H1("Welcome back, " + str(fname) + " " + str(lname) + "!"),
+                            style={"width":"100%", "textAlign":"left", "vertical-align":"bottom"})
+                    ])
                 )
             )
-        ]
-, id="home_layout")
+        ]),
+        dbc.Container([
+            dbc.Row(
+                dbc.Card(
+                    children=[
+                        dbc.CardHeader(html.H2("Team Memberships", style={"textAlign":"center"})),
+                        dbc.CardBody([
+                            html.Div(
+                                "This section exists to create project teams consisting of appropriate users who have registered and " +
+                                "have been approved to use MLExchange resources. Please use the buttons below to navigate through team" + 
+                                " creation and team membership management. Note that the goal of teams is to serve as a method of controlling" +
+                                "  user access to owned assets relating to MLExchange.",
+                                style={"width":"100%", "textAlign":"left"}),
+                            dbc.Row(html.Div(memberships, style={'width':'100%', 'margin-top':'10px', 'margin-bottom':'10px'})),
+                            dbc.Row(html.Div(team_input_groups, style={'width':'100%', 'margin-bottom':'10px'})),
+                            dbc.Row([
+                                html.Div(t_team_layout),
+                                html.Div(t_members_layout)
+                            ])
+                        ])
+                    ]
+                )
+            ),    
+            dbc.Row(
+                dbc.Card(
+                    children=[
+                        dbc.CardHeader(html.H2("Computing Resources", style={"textAlign":"center"})),
+                        dbc.CardBody([
+                            html.Div(
+                                "Your accessible computing resources and respective role are listed below.",
+                                style={"width":"100%", "textAlign":"left"}),
+                            dbc.Row(compute_table),
+                            html.Div(
+                                "Please check the list of documented computing locations prior to submitting a request for a new " +
+                                "computing location to be added to the database. To add a private computing location to the database" +
+                                " for your teams, please visit the Compute tab.",
+                                style={"width":"100%", "textAlign":"left"}),
+                            html.Div(
+                                dbc.Row(dbc.InputGroup([
+                                    dbc.Col(dbc.Button(
+                                        "Access Management",
+                                        outline=True,
+                                        color="primary",
+                                        id="cr-manage",
+                                        style={"text-transform": "none", "width":"100%"}),
+                                        align="center"),
+                                    dbc.Col(dbc.Button(
+                                        "Private Computing",
+                                        outline=True,
+                                        color="primary",
+                                        id="compute-tab-button",
+                                        href="/mlex_compute",
+                                        style={"text-transform": "none", "width":"100%"}),
+                                    align="center")
+                                ])),
+                            style={'width':'100%', 'margin-top':'10px'}),
+                            dbc.Row(cr_manage_layout) # place collapse user tab here
+                        ])
+                    ]
+                )
+            )
+        ])
+    ],
+id="home_layout")
 
 ## REACTIVE CALLBACKS ##
 @app.callback(
@@ -457,15 +576,6 @@ def rem_from_team(n, email, tname):
     else:
         return "", ""
 
-# @app.callback(
-#     Output("dd-owned-team-output", "children"),
-#     Input("dd-owned-team", "value"),
-#     prevent_initial_call=True
-# )
-
-# def update_output_dd_owned_team(value):
-#     return f'You have selected Team {value}.'
-
 @app.callback(
     Output('mem-team-table', 'data'),
     Output('view-team-table', 'is_open'),
@@ -488,3 +598,86 @@ def update_team_table(n, tname):
     if 'view-team' in changed_id:
         is_open = True
         return data_table, is_open
+
+@app.callback(
+    Output('cr-mem-table', 'data'),
+    Output('view-cr-table', 'is_open'),
+    Input('view-cr', 'n_clicks'),
+    State("view-cr-hostname","value"),
+    prevent_initial_call=True
+)
+
+def update_cr_table(n, hostname):
+    '''
+    This callback updates the compute resource's access management tab in the mlex_userhome layout
+    Returns:
+        cr-mem-table:     Updates the compute resource's user table
+    '''
+    is_open = False
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+    
+    url = "http://user-api:5000/api/v0/requests/" + str(user_id) + "/compute/" + str(hostname) + "/users/"
+    data_table = requests.get(url).json()
+    if 'view-cr' in changed_id:
+        is_open = True
+        return data_table, is_open
+
+@app.callback(
+    Output('cr-access-manage', 'is_open'),
+    Input('cr-manage', 'n_clicks'),
+    prevent_initial_call=True
+)
+
+def open_cr_manage(n):
+    '''
+    This callback updates the team membership tab in the mlex_userhome layout
+    Returns:
+        team-table:     Updates the user's membership table
+    '''
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+
+    if 'cr-manage' in changed_id:
+        is_open = True
+        return is_open
+
+@app.callback(
+    Output("add-user-output", "children"),
+    Input("add-to-cr", "n_clicks"),
+    State("add-user-email","value"),
+    State("add-user-hostname","value"),
+    prevent_initial_call=True,
+    suppress_callback_exceptions=True
+    )
+
+def add_to_compute(n, email, hostname):
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+
+    url = "http://user-api:5000/api/v0/requests/" + str(user_id) + "/users/" + str(email) + "/compute/hostname/" + str(hostname)
+    if n == None:
+        return "", "test"
+    if "add-to-cr" in changed_id:
+        requests.post(url)
+        return "", "User has been granted access."
+    else:
+        return "", ""
+
+@app.callback(
+    Output("rem-user-output", "children"),
+    Input("rem-from-cr", "n_clicks"),
+    State("rem-user-email","value"),
+    State("rem-user-hostname","value"),
+    prevent_initial_call=True,
+    suppress_callback_exceptions=True
+    )
+
+def rem_from_compute(n, email, hostname):
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+
+    url = "http://user-api:5000/api/v0/requests/" + str(user_id) + "/users/" + str(email) + "/compute/hostname/" + str(hostname)
+    if n == None:
+        return "", "test"
+    if "rem-from-cr" in changed_id:
+        requests.delete(url)
+        return "", "User's access has been removed."
+    else:
+        return "", ""

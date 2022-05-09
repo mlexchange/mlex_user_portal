@@ -205,11 +205,11 @@ class userAPI:
             status = print("Compute location with hostname " + str(hostname) + " either has been deleted or does not exist.")
         return status
     
-    def add_user_to_compute(self, uuid:str, cname:str, chostname:str):
+    def add_user_to_compute(self, uuid:str, chostname:str):
         ''' Assigns a user to a compute location. '''
-        parameters = {'uuid': uuid, 'cname': cname, 'chostname':chostname}
+        parameters = {'uuid': uuid, 'chostname':chostname}
         cquery = '''
-        MATCH (u:user {uuid:$uuid}), (cl:Compute {name:$cname, hostname:$chostname})
+        MATCH (u:user {uuid:$uuid}), (cl:Compute {hostname:$chostname})
         MERGE (u)-[relat:user_of]->(cl)
         RETURN count(relat) as counts
         '''
@@ -220,11 +220,11 @@ class userAPI:
             status = print("[WARNING] User " + str(uuid) + " access to compute location " +str(chostname) + " was not updated.")
         return status
 
-    def remove_user_from_compute(self, uuid:str, cname:str, chostname:str):
+    def remove_user_from_compute(self, uuid:str, chostname:str):
         ''' Removes a user from compute location. '''
-        parameters = {'uuid': uuid, 'cname': cname, 'chostname':chostname}
+        parameters = {'uuid': uuid, 'chostname':chostname}
         cquery = '''
-        MATCH (u:user {uuid:$uuid})-[rel:user_of]->(cl:Compute {name:$cname, hostname:$chostname})
+        MATCH (u:user {uuid:$uuid})-[rel:user_of]->(cl:Compute {hostname:$chostname})
         WITH rel, count(rel) as counts
         CALL apoc.do.when(counts > 0,
             'DELETE rel RETURN toInteger(1) AS result',
@@ -560,15 +560,133 @@ class userAPI:
         status = self.session.run(cquery).data()
         return [s['comp'] for s in status]
     
-    def get_compute_for_user(self, uuid:str):
-        """ Get all compute locations that a single user can access. """
+    def get_compute_for_user(self, uuid:str, compute_api:bool=False):
+        """
+        Get all compute locations that a single user can access.
+        compute_api is true when compute api is performing the call.
+        """
+        parameters = {'uuid':uuid}
+        if compute_api==True:
+            cquery = '''
+            MATCH (cr:Compute) <-[rel:owner_of]-(u:user {uuid:$uuid})
+            RETURN cr
+            UNION
+            MATCH (cr:Compute) <-[rel:manager_of]-(u:user {uuid:$uuid})
+            RETURN cr
+            UNION
+            MATCH (cr:Compute) <-[rel:user_of]-(u:user {uuid:$uuid})
+            RETURN cr
+            '''
+            cr_list = self.session.run(cquery,parameters=parameters).data()
+            return [s['cr'] for s in cr_list]
+        else:
+            cquery = '''
+            MATCH (comp1:Compute)<-[rel1:owner_of]-(u1:user {uuid:$uuid})
+            WITH count(rel1) AS counts, comp1, u1
+            CALL apoc.do.when(counts <> 1,
+                '',
+                'RETURN "Owner" AS result',
+                {counts:counts}) YIELD value
+            RETURN comp1.name AS name, comp1.hostname AS hostname, value.result AS role
+            UNION
+            MATCH (comp2:Compute)<-[rel2:manager_of]-(u2:user {uuid:$uuid})
+            WITH count(rel2) AS counts, comp2, u2
+            CALL apoc.do.when(counts <> 1,
+                '',
+                'RETURN "Manager" AS result',
+                {counts:counts}) YIELD value
+            RETURN comp2.name AS name, comp2.hostname AS hostname, value.result AS role
+            UNION
+            MATCH (comp3:Compute)<-[rel3:user_of]-(u3:user {uuid:$uuid})
+            WITH count(rel3) AS counts, comp3, u3
+            CALL apoc.do.when(counts <> 1,
+                '',
+                'RETURN "User" AS result',
+                {counts:counts}) YIELD value
+            RETURN comp3.name AS name, comp3.hostname AS hostname, value.result AS role
+            '''
+            cr_dict = self.session.run(cquery, parameters=parameters).data()
+            return cr_dict
+    
+    def get_compute_rel_for_user(self, chostname:str, uuid:str):
+        parameters = {'chostname':chostname, 'uuid':uuid}
+        cquery = '''
+        MATCH (comp:Compute {hostname:$chostname})<-[rel1:owner_of]-(u:user {uuid:$uuid})
+        WITH count(rel1) AS counts
+        CALL apoc.do.when(counts <> 1,
+            '',
+            'RETURN "Owner" AS result',
+            {counts:counts}) YIELD value
+        RETURN value.result AS rel
+        '''
+        rel = self.session.run(cquery, parameters=parameters).data()[0]['rel']
+        if rel != None:
+            return rel
+        else:
+            cquery = '''
+            MATCH (comp:Compute {hostname:$chostname})<-[rel2:manager_of]-(u:user {uuid:$uuid})
+            WITH count(rel2) AS counts
+            CALL apoc.do.when(counts <> 1,
+                '',
+                'RETURN "Manager" AS result',
+                {counts:counts}) YIELD value
+            RETURN value.result AS rel
+            '''
+            rel = self.session.run(cquery, parameters=parameters).data()[0]['rel']
+            if rel != None:
+                return rel
+            else:
+                cquery = '''
+                MATCH (comp:Compute {hostname:$chostname})<-[rel3:user_of]-(u:user {uuid:$uuid})
+                WITH count(rel3) AS counts
+                CALL apoc.do.when(counts <> 1,
+                    '',
+                    'RETURN "User" AS result',
+                    {counts:counts}) YIELD value
+                RETURN value.result AS rel
+                '''
+                rel = self.session.run(cquery, parameters=parameters).data()[0]['rel']
+                return rel
+
+    def get_role_for_user(self, uuid:str):
         parameters = {'uuid':uuid}
         cquery = '''
-        match (comp:Compute)<-[rel:user_of]-(u:user {uuid:$uuid})
-        return comp
+        MATCH (u:user {uuid:$uuid}) -[:has_attr]-> (r:Role)
+        RETURN r.name AS role
         '''
-        status = self.session.run(cquery, parameters=parameters).data()
-        return [s['comp'] for s in status]
+        role = self.session.run(cquery, parameters=parameters).data()[0]['role']
+        return role
+    
+    def get_users_for_compute(self, hostname:str):
+        """ Takes a compute and returns all users (fname, lname, email, role) for that compute."""
+        parameters = {'hostname':hostname}
+        cquery='''
+        MATCH (comp1:Compute {hostname:$hostname}) <-[rel1:owner_of]- (u1:user)-[:owner_of]->(up1:UserProfile)
+        WITH count(rel1) AS counts, comp1, u1, up1
+        CALL apoc.do.when(counts <> 1,
+            '',
+            'RETURN "Owner" AS result',
+            {counts:counts}) YIELD value
+        RETURN comp1.hostname AS hostname, up1.fname AS fname, up1.lname AS lname, up1.email AS email, value.result AS role
+        UNION
+        MATCH (comp2:Compute {hostname:$hostname})<-[rel2:manager_of]-(u2:user)-[:owner_of]->(up2:UserProfile)
+        WITH count(rel2) AS counts, comp2, u2, up2
+        CALL apoc.do.when(counts <> 1,
+            '',
+            'RETURN "Manager" AS result',
+            {counts:counts}) YIELD value
+        RETURN comp2.hostname AS hostname, up2.fname AS fname, up2.lname AS lname, up2.email AS email, value.result AS role
+        UNION
+        MATCH (comp3:Compute {hostname:$hostname})<-[rel3:user_of]-(u3:user)-[:owner_of]->(up3:UserProfile)
+        WITH count(rel3) AS counts, comp3, u3, up3
+        CALL apoc.do.when(counts <> 1,
+            '',
+            'RETURN "User" AS result',
+            {counts:counts}) YIELD value
+        RETURN comp3.hostname AS hostname, up3.fname AS fname, up3.lname AS lname, up3.email AS email, value.result AS role
+        '''
+        cr_users_dict = self.session.run(cquery, parameters=parameters).data()
+        return cr_users_dict
 
     def get_all_teams(self):
         cquery = '''

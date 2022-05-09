@@ -77,14 +77,26 @@ def create_compute(compute_name:str,compute_hostname:str):
     status = api.create_compute(name=compute_name, hostname=compute_hostname)
     return status
 
-@app.post(API_URL_PREFIX + "/users/{user_id}/compute/name/{compute_name}/hostname/{compute_hostname}", tags=['users','compute'])
-def add_user_to_compute(user_id:str, compute_name:str, compute_hostname:str):
-    status = api.add_user_to_compute(uuid=user_id, cname=compute_name, chostname=compute_hostname)
+@app.post(API_URL_PREFIX + "/requests/{requestor_id}/users/{email}/compute/hostname/{compute_hostname}", tags=['requests','users','compute'])
+def add_user_to_compute(requestor_id: str, email:str, compute_hostname:str):
+    role = api.get_role_for_user(requestor_id)
+    rel = api.get_compute_rel_for_user(chostname=compute_hostname, uuid=requestor_id)
+    user_id = str(api.get_uuid_from_email(email))
+    if role == ('Admin' or 'MLE Admin'):
+        status = api.add_user_to_compute(uuid=user_id, chostname=compute_hostname)
+    if rel == ('Manager' or 'Owner'):
+        status = api.add_user_to_compute(uuid=user_id, chostname=compute_hostname)
     return status
 
-@app.delete(API_URL_PREFIX + "/users/{user_id}/compute/name/{compute_name}/hostname/{compute_hostname}", tags=['users', 'compute'])
-def remove_user_from_compute(user_id:str, compute_name:str, compute_hostname:str):
-    status = api.remove_user_from_compute(uuid=user_id, cname=compute_name, chostname=compute_hostname)
+@app.delete(API_URL_PREFIX + "/requests/{requestor_id}/users/{email}/compute/hostname/{compute_hostname}", tags=['requests','users', 'compute'])
+def remove_user_from_compute(requestor_id:str, email:str, compute_hostname:str):
+    role = api.get_role_for_user(requestor_id)
+    rel = api.get_compute_rel_for_user(chostname=compute_hostname, uuid=requestor_id)
+    user_id = str(api.get_uuid_from_email(email))
+    if role == ('Admin' or 'MLE Admin'):
+        status = api.remove_user_from_compute(uuid=user_id, chostname=compute_hostname)
+    if rel == ('Manager' or 'Owner'):
+        status = api.remove_user_from_compute(uuid=user_id, chostname=compute_hostname)
     return status
 
 @app.delete(API_URL_PREFIX + "/compute/name/{compute_name}/hostname/{compute_hostname}", tags=['compute'])
@@ -177,45 +189,82 @@ def delete_user_asset(userasset_id:str, user_id:str):
     return status
 
 ### GET NEO4J DB INFORMATION ###
-@app.get(API_URL_PREFIX + "/users/status/{active}", tags=['users'])
-def get_userdb_metadata(active:bool):
-    user_db = api.get_userdb_metadata(active)
+@app.get(API_URL_PREFIX + "/requests/{requestor_id}/users/status/{active}", tags=['requests', 'users'])
+def get_userdb_metadata(requestor_id:str, active:bool):
+    # check for auth -- current auth for root (admin) and mle admin
+    role = api.get_role_for_user(requestor_id)
+    if role == ('Admin' or 'MLE Admin'):
+        user_db = api.get_userdb_metadata(active)
+    else:
+        user_db = []
     return user_db
 
-@app.get(API_URL_PREFIX + "/users/{user_id}", tags=['users'])
-def get_metadata_for_user(user_id:str):
-    userid_metadata = api.get_metadata_for_user(user_id)
+@app.get(API_URL_PREFIX + "/requests/{requestor_id}/users/{user_id}", tags=['requests', 'users'])
+def get_metadata_for_user(requestor_id:str, user_id:str):
+    role = api.get_role_for_user(requestor_id)
+    if role == ('Admin' or 'MLE Admin'):
+        userid_metadata = api.get_metadata_for_user(user_id)
+    else:
+        userid_metadata = []
     return userid_metadata
 
-@app.get(API_URL_PREFIX + "/assets/", tags=['assets'])
-def get_all_assets():
-    assets = api.get_all_assets()
+@app.get(API_URL_PREFIX + "/requests/{requestor_id}/assets/", tags=['requests', 'assets'])
+def get_all_assets(requestor_id:str):
+    role = api.get_role_for_user(requestor_id)
+    if role == ('Admin'):
+        assets = api.get_all_assets()
+    else:
+        assets = []
     return assets
 
-@app.get(API_URL_PREFIX + "/roles/", tags=['roles'])
-def get_all_roles():
-    roles = api.get_all_roles()
+@app.get(API_URL_PREFIX + "/requests/{requestor_id}/roles/", tags=['requests', 'roles'])
+def get_all_roles(requestor_id:str):
+    role = api.get_role_for_user(requestor_id)
+    if role == ('Admin'):
+        roles = api.get_all_roles()
+    else:
+        roles = []
     return roles
 
-@app.get(API_URL_PREFIX + "/compute/", tags=['compute'])
-def get_all_compute():
-    compute = api.get_all_compute()
+@app.get(API_URL_PREFIX + "/teams/", tags=['teams'])
+def get_all_teams(requestor_id:str):
+    role = api.get_role_for_user(requestor_id)
+    if role == ('Admin'):
+        teams = api.get_all_teams()
+    else:
+        teams=[]
+    return teams
+
+@app.get(API_URL_PREFIX + "/requests/{requestor_id}/compute/", tags=['requests', 'compute'])
+def get_all_compute(requestor_id:str):
+    role = api.get_role_for_user(requestor_id)
+    if role == ('Admin'):
+        compute = api.get_all_compute()
+    else:
+        compute = []
     return compute
 
 @app.get(API_URL_PREFIX + "/users/{user_id}/compute/", tags=['users','compute'])
 def get_compute_for_user(user_id:str):
-    compute = api.get_compute_for_user(uuid=user_id)
+    compute = api.get_compute_for_user(uuid=user_id, compute_api=False)
     return compute
+
+@app.get(API_URL_PREFIX + "/requests/{requestor_id}/compute/{compute_hostname}/users/", tags=['requests','users','compute'])
+def get_users_for_compute(requestor_id:str, compute_hostname:str):
+    role = api.get_role_for_user(requestor_id)
+    rel = api.get_compute_rel_for_user(chostname=compute_hostname, uuid=requestor_id)
+    if role == ('Admin' or 'MLE Admin'):
+        users_dict = api.get_users_for_compute(hostname=compute_hostname)
+    if rel == ('Manager' or 'Owner'):
+        users_dict = api.get_users_for_compute(hostname=compute_hostname)
+    else:
+        users_dict = []
+    return users_dict
 
 @app.get(API_URL_PREFIX + "/users/{user_id}/content/userassets/", tags=['users','content','userassets'])
 def get_assets_for_user(user_id):
     assets = api.get_assets_for_user(user_id)
     return assets
-
-@app.get(API_URL_PREFIX + "/teams/", tags=['teams'])
-def get_all_teams():
-    teams = api.get_all_teams()
-    return teams
 
 @app.get(API_URL_PREFIX + "/users/", tags=['users'])
 def get_users(user_id:str, first_name:Optional[str]=None, last_name:Optional[str]=None, uuid:Optional[str]=None, email:Optional[str]=None):

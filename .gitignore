@@ -129,3 +129,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# notes
+user_api/src/test.ipynb
+notebooks/Make_figure_2.ipynb
