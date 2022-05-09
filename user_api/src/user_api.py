@@ -77,15 +77,26 @@ def create_compute(compute_name:str,compute_hostname:str):
     status = api.create_compute(name=compute_name, hostname=compute_hostname)
     return status
 
-@app.post(API_URL_PREFIX + "/users/{user_id}/compute/name/{compute_name}/hostname/{compute_hostname}", tags=['users','compute'])
-def add_user_to_compute(requestor_id: str, user_id:str, compute_name:str, compute_hostname:str):
-    
-    status = api.add_user_to_compute(uuid=user_id, cname=compute_name, chostname=compute_hostname)
+@app.post(API_URL_PREFIX + "/requests/{requestor_id}/users/{email}/compute/hostname/{compute_hostname}", tags=['requests','users','compute'])
+def add_user_to_compute(requestor_id: str, email:str, compute_hostname:str):
+    role = api.get_role_for_user(requestor_id)
+    rel = api.get_compute_rel_for_user(chostname=compute_hostname, uuid=requestor_id)
+    user_id = str(api.get_uuid_from_email(email))
+    if role == ('Admin' or 'MLE Admin'):
+        status = api.add_user_to_compute(uuid=user_id, chostname=compute_hostname)
+    if rel == ('Manager' or 'Owner'):
+        status = api.add_user_to_compute(uuid=user_id, chostname=compute_hostname)
     return status
 
-@app.delete(API_URL_PREFIX + "/users/{user_id}/compute/name/{compute_name}/hostname/{compute_hostname}", tags=['users', 'compute'])
-def remove_user_from_compute(user_id:str, compute_name:str, compute_hostname:str):
-    status = api.remove_user_from_compute(uuid=user_id, cname=compute_name, chostname=compute_hostname)
+@app.delete(API_URL_PREFIX + "/requests/{requestor_id}/users/{email}/compute/hostname/{compute_hostname}", tags=['requests','users', 'compute'])
+def remove_user_from_compute(requestor_id:str, email:str, compute_hostname:str):
+    role = api.get_role_for_user(requestor_id)
+    rel = api.get_compute_rel_for_user(chostname=compute_hostname, uuid=requestor_id)
+    user_id = str(api.get_uuid_from_email(email))
+    if role == ('Admin' or 'MLE Admin'):
+        status = api.remove_user_from_compute(uuid=user_id, chostname=compute_hostname)
+    if rel == ('Manager' or 'Owner'):
+        status = api.remove_user_from_compute(uuid=user_id, chostname=compute_hostname)
     return status
 
 @app.delete(API_URL_PREFIX + "/compute/name/{compute_name}/hostname/{compute_hostname}", tags=['compute'])
