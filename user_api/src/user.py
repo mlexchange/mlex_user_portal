@@ -205,11 +205,11 @@ class userAPI:
             status = print("Compute location with hostname " + str(hostname) + " either has been deleted or does not exist.")
         return status
     
-    def add_user_to_compute(self, uuid:str, cname:str, chostname:str):
+    def add_user_to_compute(self, uuid:str, chostname:str):
         ''' Assigns a user to a compute location. '''
-        parameters = {'uuid': uuid, 'cname': cname, 'chostname':chostname}
+        parameters = {'uuid': uuid, 'chostname':chostname}
         cquery = '''
-        MATCH (u:user {uuid:$uuid}), (cl:Compute {name:$cname, hostname:$chostname})
+        MATCH (u:user {uuid:$uuid}), (cl:Compute {hostname:$chostname})
         MERGE (u)-[relat:user_of]->(cl)
         RETURN count(relat) as counts
         '''
@@ -220,11 +220,11 @@ class userAPI:
             status = print("[WARNING] User " + str(uuid) + " access to compute location " +str(chostname) + " was not updated.")
         return status
 
-    def remove_user_from_compute(self, uuid:str, cname:str, chostname:str):
+    def remove_user_from_compute(self, uuid:str, chostname:str):
         ''' Removes a user from compute location. '''
-        parameters = {'uuid': uuid, 'cname': cname, 'chostname':chostname}
+        parameters = {'uuid': uuid, 'chostname':chostname}
         cquery = '''
-        MATCH (u:user {uuid:$uuid})-[rel:user_of]->(cl:Compute {name:$cname, hostname:$chostname})
+        MATCH (u:user {uuid:$uuid})-[rel:user_of]->(cl:Compute {hostname:$chostname})
         WITH rel, count(rel) as counts
         CALL apoc.do.when(counts > 0,
             'DELETE rel RETURN toInteger(1) AS result',
