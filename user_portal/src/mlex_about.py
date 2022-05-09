@@ -28,7 +28,7 @@ layout = html.Div(
                 dbc.Row(
                     dbc.Card(
                         children=[
-                            dbc.CardHeader(html.Div(html.H4("Overview"))),
+                            dbc.CardBody(html.Div(html.H3("Overview"))),
                             dbc.CardBody("MLExchange is an open source platform that deploys machine learning " +
                             "(ML) models for beamline scientists,  which will act as a shared repository, " +
                             "populated with community algorithms, models, and datasets. This platform is under " +
