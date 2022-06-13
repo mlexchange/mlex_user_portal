@@ -82,9 +82,9 @@ def add_user_to_compute(requestor_id: str, email:str, compute_hostname:str):
     role = api.get_role_for_user(requestor_id)
     rel = api.get_compute_rel_for_user(chostname=compute_hostname, uuid=requestor_id)
     user_id = str(api.get_uuid_from_email(email))
-    if role == ('Admin' or 'MLE Admin'):
+    if role in ['Admin','MLE Admin']:
         status = api.add_user_to_compute(uuid=user_id, chostname=compute_hostname)
-    if rel == ('Manager' or 'Owner'):
+    if rel in ['Manager','Owner']:
         status = api.add_user_to_compute(uuid=user_id, chostname=compute_hostname)
     return status
 
@@ -93,9 +93,9 @@ def remove_user_from_compute(requestor_id:str, email:str, compute_hostname:str):
     role = api.get_role_for_user(requestor_id)
     rel = api.get_compute_rel_for_user(chostname=compute_hostname, uuid=requestor_id)
     user_id = str(api.get_uuid_from_email(email))
-    if role == ('Admin' or 'MLE Admin'):
+    if role in ['Admin','MLE Admin']:
         status = api.remove_user_from_compute(uuid=user_id, chostname=compute_hostname)
-    if rel == ('Manager' or 'Owner'):
+    if rel in ['Manager','Owner']:
         status = api.remove_user_from_compute(uuid=user_id, chostname=compute_hostname)
     return status
 
@@ -202,7 +202,7 @@ def get_content_for_user(requestor_id:str, user_id:str):
 def get_userdb_metadata(requestor_id:str, active:bool):
     # check for auth -- current auth for root (admin) and mle admin
     role = api.get_role_for_user(requestor_id)
-    if role is ('Admin' or 'MLE Admin'):
+    if role in ['Admin','MLE Admin']:
         user_db = api.get_userdb_metadata(active)
     else:
         user_db = []
@@ -211,7 +211,7 @@ def get_userdb_metadata(requestor_id:str, active:bool):
 @app.get(API_URL_PREFIX + "/requests/{requestor_id}/users/{user_id}", tags=['requests', 'users'])
 def get_metadata_for_user(requestor_id:str, user_id:str):
     role = api.get_role_for_user(requestor_id)
-    if role == ('Admin' or 'MLE Admin'):
+    if role in ['Admin','MLE Admin']:
         userid_metadata = api.get_metadata_for_user(user_id)
     else:
         userid_metadata = []
@@ -262,9 +262,9 @@ def get_compute_for_user(user_id:str):
 def get_users_for_compute(requestor_id:str, compute_hostname:str):
     role = api.get_role_for_user(requestor_id)
     rel = api.get_compute_rel_for_user(chostname=compute_hostname, uuid=requestor_id)
-    if role == ('Admin' or 'MLE Admin'):
+    if role in ['Admin','MLE Admin']:
         users_dict = api.get_users_for_compute(hostname=compute_hostname)
-    if rel == ('Manager' or 'Owner'):
+    if rel in ['Manager','Owner']:
         users_dict = api.get_users_for_compute(hostname=compute_hostname)
     else:
         users_dict = []
