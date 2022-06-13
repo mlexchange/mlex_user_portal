@@ -189,11 +189,20 @@ def delete_user_asset(userasset_id:str, user_id:str):
     return status
 
 ### GET NEO4J DB INFORMATION ###
+@app.get(API_URL_PREFIX + "/requests/{requestor_id}/users/{user_id}/content/", tags=['requests', 'users', 'content'])
+def get_content_for_user(requestor_id:str, user_id:str):
+    role = api.get_role_for_user(requestor_id)
+    if (role in ['Admin','MLE Admin']) or (requestor_id==user_id):
+        content_scope_list = api.get_content_for_user(user_id)
+    else:
+        content_scope_list = []
+    return content_scope_list
+
 @app.get(API_URL_PREFIX + "/requests/{requestor_id}/users/status/{active}", tags=['requests', 'users'])
 def get_userdb_metadata(requestor_id:str, active:bool):
     # check for auth -- current auth for root (admin) and mle admin
     role = api.get_role_for_user(requestor_id)
-    if role == ('Admin' or 'MLE Admin'):
+    if role is ('Admin' or 'MLE Admin'):
         user_db = api.get_userdb_metadata(active)
     else:
         user_db = []
