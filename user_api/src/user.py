@@ -744,6 +744,21 @@ class userAPI:
         uuid = self.session.run(cquery, parameters=parameters).data()[0]['uuid']
         return uuid
 
+    def get_content_for_user(self, uuid:str):
+        ''' Uses user id to fetch content registry assets to which the users
+        have access. Return type is list. '''
+        parameters={'uuid':uuid}
+        cquery = '''
+        MATCH (u:user {uuid:$uuid})--(ca:content)
+        RETURN ca.cuid AS content_uid
+        UNION
+        MATCH (ca1:content) -[:has_attr]-> (pub:Attribute {name:'Public'})
+        RETURN ca1.cuid AS content_uid
+        '''
+        content_list_dict = self.session.run(cquery, parameters=parameters).data()
+        content_list = [a_dict["content_uid"] for a_dict in content_list_dict]
+        return content_list
+
     def get_users(self, key_value, requestor):
         ''' This method will get all users including their profiles.
             The key will filter out irrelevant users.
@@ -1224,8 +1239,8 @@ class userAPI:
         return status
 
 if __name__ == '__main__':
-    #api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
-    api = userAPI(url="bolt://44.202.196.68:7687", auth=("neo4j", "defect-town-lifeboat"))
+    api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
+    #api = userAPI(url="bolt://44.202.196.68:7687", auth=("neo4j", "defect-town-lifeboat"))
     #kv = {'fname': None, 'lname': None, 'uuid': None, 'email': None} 
     #api.get_users(kv, requestor='u_HYanxon00001')
 
