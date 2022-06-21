@@ -14,7 +14,7 @@ From the main directory:
 	- `vim user.py`
 	- Go to line 716 and replace `url` and `auth` information with neo4j server information. Save and exit.
     - `python user.py` will populate the server with a sample database.
-5. Return to main directory.
+5. Return to root directory.
 6. `docker-compose up --build`
 7. In Docker Desktop: navigate to front-end using the 'open in browser' (far left) option of the 'user-portal' container in 'mlex_user_portal'.
 
