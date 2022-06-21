@@ -9,8 +9,9 @@ import mlex_login
 import mlex_userhome
 import mlex_about
 import mlex_logout
-# import mlex_adminhome
+import mlex_adminhome
 
+user_id = "u_HKrish00003"
 
 default_layout = [dbc.Row([
     html.Div(dcc.Link('Login', href='/mlex_login'), style={'width':'60px', 'display':'inline-block'}),
@@ -88,6 +89,7 @@ app.layout = html.Div(
     Input('url', 'pathname'))
 
 def display_page(pathname):
+    role = "http://user-api:5000/api/v0/requests/users/" + str(user_id) + "roles/"
     if pathname == "/mlex_userhome":
         return mlex_userhome.layout, loggedin_layout
     if pathname == "/mlex_search":
@@ -96,6 +98,8 @@ def display_page(pathname):
         return html.Iframe("https://content.mlexchange.lbl.gov"), loggedin_layout
     if pathname == "/mlex_compute":
         return html.Iframe("https://compute.mlexchange.lbl.gov"), loggedin_layout
+    if pathname == "/mlex_userhome" and role == "Admin":
+        return mlex_adminhome.layout, loggedin_layout
 
 
 # for testing interface

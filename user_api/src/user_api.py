@@ -189,8 +189,8 @@ def delete_user_asset(userasset_id:str, user_id:str):
     return status
 
 ### GET NEO4J DB INFORMATION ###
-@app.get(API_URL_PREFIX + "/requests/users/{user_id}/roles/{role}", tags=['requests', 'users', 'roles'])
-def get_role_for_user(user_id:str, role:str):
+@app.get(API_URL_PREFIX + "/requests/users/{user_id}/roles/", tags=['requests', 'users', 'roles'])
+def get_role_for_user(user_id:str):
     role = api.get_role_for_user(user_id)
     return role
 
