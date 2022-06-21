@@ -22,7 +22,7 @@ class userAPI:
             'RETURN toInteger(0) AS result',
             'MERGE (r:Role:Attribute {name:role}) RETURN toInteger(1) AS result',
             {counts:counts, role:$role}) YIELD value
-        RETURN value.result as results        
+        RETURN value.result as results
         '''
         counts = self.session.run(cquery, parameters=parameters).data()
         if counts[0].get('results') > 0:
@@ -60,7 +60,7 @@ class userAPI:
             DELETE rel
             RETURN u
         }
-        WITH u, r 
+        WITH u, r
         MERGE (u)-[rel:has_attr]->(r)
         RETURN toInteger(count(rel)) AS result
         '''
@@ -101,11 +101,10 @@ class userAPI:
             '''
             dbindx = len([dict(_) for _ in self.session.run(cquery)]) + 1
             temp_id = 'u_' + str(fname[0] + lname + str(dbindx).zfill(5))
-            
             parameters = {'temp_id': temp_id, 'fname': fname, 'lname': lname, 'email': email, 'orcid': orcid, 'role': 'Unapproved'}
             cquery = '''
             MATCH (r:Role {name:$role})
-            MERGE (up:UserProfile:Object 
+            MERGE (up:UserProfile:Object
             {fname: $fname, lname: $lname, email: $email, orcid: $orcid, uuid: $temp_id, active:True})<-[:owner_of]-(u:Subject:user:Primitive {uuid: $temp_id})-[:has_attr]->(r)
             SET u.active = True
             RETURN u.uuid AS userid
@@ -378,7 +377,7 @@ class userAPI:
                 MATCH (ca:content {cuid:$cuid})
                 RETURN count(ca) AS counts
             }
-                        
+
             WITH counts, $cuid AS c_uid
             CALL apoc.do.when(counts = 0,
                 'CREATE (ca:content:Object:Primitive {cuid:c_uid}) RETURN ca.cuid AS result',
@@ -1102,7 +1101,7 @@ class userAPI:
         status = self.session.run(cquery, parameters=parameters).data()
 
         return status
-        
+
     def change_action_policy(self, action, policy_owner, policy_name):
         # check policy owner and policy relation
         t = self.check_policy_owner_relation(policy_owner, policy_name)
@@ -1132,7 +1131,7 @@ class userAPI:
         if not len(status):
             msg = 'The action that can\'t be changed due to no relationship found.'
             raise ValueError(msg)
-        
+
         cquery = f'''
         {cquery0}
         {cquery1}
@@ -1160,7 +1159,7 @@ class userAPI:
         else:
             msg = 'The user and/or the policy don\'t exist'
             raise ValueError(msg)
-               
+
         parameters = {'uuid': policy_owner, 'name': policy_name}
         cquery = '''
         match (u:user {uuid: $uuid})-[:owner_of]->(p:Policy {name: $name})
@@ -1177,7 +1176,7 @@ class userAPI:
     def test_policy1(self):
         ''' Admin have full access ALL database objects and assets. '''
         cquery = '''
-        /// Policy 1 - Admin has full access to UserProfiles, Content Assets, User Assets, Computing Resources 
+        /// Policy 1 - Admin has full access to UserProfiles, Content Assets, User Assets, Computing Resources
         match (admin:Role {name: 'Admin'})
         match (up:UserProfile), (ca:content), (ua:UserAsset), (comp:Compute)
         match (act:fullAccess {name:"Full Access"})
@@ -1194,11 +1193,11 @@ class userAPI:
 
     def test_policy2(self):
         cquery = '''
-        /// Policy 2 - Admin and MLE Admin have full access to ALL Content 
+        /// Policy 2 - Admin and MLE Admin have full access to ALL Content
         match (admin:Role {name: 'Admin'}), (mleadmin:Role {name: 'MLE Admin'})
         match (ca:content)
         match (act:fullAccess {name:"Full Access"})
-        create (pol:Policy {name: 'Policy2', decision: 'Permit'})     
+        create (pol:Policy {name: 'Policy2', decision: 'Permit'})
         merge (pol)<-[:SUB_CON]-(admin)
         merge (pol)<-[:SUB_CON]-(mleadmin)
         merge (pol)<-[:OBJ_CON]-(ca)
@@ -1226,11 +1225,25 @@ class userAPI:
             status = bool(False)
         return status
 
+    def get_all_unapproved_users(self):
+        parameters = {'role': 'Unapproved'}
+        cquery = '''
+        MATCH (ui:UserProfile)<-[:owner_of]-(tu:user)-[:has_attr]->(r:Role {name:$role})
+        RETURN ui, tu
+        '''
+        status = self.session.run(cquery, parameters=parameters).data()
+        users = []
+        for s in status:
+            if s['tu']['active'] == True and s['tu']['uuid'] == s['ui']['uuid']:
+                users.append(s['ui'])
+        return users
+
 if __name__ == '__main__':
     api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
-    #api = userAPI(url="bolt://44.202.196.68:7687", auth=("neo4j", "defect-town-lifeboat"))
-    #kv = {'fname': None, 'lname': None, 'uuid': None, 'email': None} 
+    #api = userAPI(url="bolt://35.172.250.196:7687", auth=("neo4j", "interior-discrepancies-hair"))
+    #kv = {'fname': None, 'lname': None, 'uuid': None, 'email': None}
     #api.get_users(kv, requestor='u_HYanxon00001')
+    #api.get_all_unapproved_users()
 
     ### For development purposes: creating sample db ###
     # Create neo4j AUTH DB roles
@@ -1287,18 +1300,18 @@ if __name__ == '__main__':
     # Create user assets
     api.create_user_asset(name='UAsset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
     api.create_user_asset(name='UAsset_00001', owner='u_HKrish00003', type='Trained_Model', path='HERE')
-    
+
     # Create a Policy
-    api.create_new_policy(subject_dict={'Team': ('name', 'MLExchange_Team')}, 
-                          object_dict={'content': ('name', 'CAsset_00002')}, 
-                          action='Read', 
+    api.create_new_policy(subject_dict={'Team': ('name', 'MLExchange_Team')},
+                          object_dict={'content': ('name', 'CAsset_00002')},
+                          action='Read',
                           policy_owner='u_HKrish00003',
                           policy_name='TestPolicy')
 
-    #api.add_subject_to_policy(subject_dict={'user': ('uuid', 'u_JSmith00004')}, policy_owner='u_HKrish00003', policy_name='TestPolicy')
+    api.add_subject_to_policy(subject_dict={'user': ('uuid', 'u_JSmith00004')}, policy_owner='u_HKrish00003', policy_name='TestPolicy')
     #api.remove_subject_from_policy(subject_dict={'user': ('uuid', 'u_JSmith00004')}, policy_owner='u_HKrish00003', policy_name='TestPolicy')
 
-    #api.add_object_to_policy(object_dict={'UserAsset': ('name', 'UAsset_00001')}, policy_owner='u_HKrish00003', policy_name='TestPolicy')
+    api.add_object_to_policy(object_dict={'UserAsset': ('name', 'UAsset_00001')}, policy_owner='u_HKrish00003', policy_name='TestPolicy')
     #api.remove_object_from_policy(object_dict={'UserAsset': ('name', 'UAsset_00001')}, policy_owner='u_HKrish00003', policy_name='TestPolicy')
 
 

@@ -13,7 +13,7 @@ app = FastAPI(  openapi_url ="/api/lbl-mlexchange/openapi.json",
              )
 
 api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
- 
+
 ### ROLES ###
 @app.post(API_URL_PREFIX + "/roles", tags=['roles'])
 def create_role(role:str):
@@ -279,4 +279,9 @@ def get_assets_for_user(user_id):
 def get_users(user_id:str, first_name:Optional[str]=None, last_name:Optional[str]=None, uuid:Optional[str]=None, email:Optional[str]=None):
     kv = {'fname': first_name, 'lname': last_name, 'uuid': uuid, 'email': email}
     users = api.get_users(kv, requestor=user_id)
+    return users
+
+@app.get(API_URL_PREFIX + "/users/", tags=['users'])
+def get_all_unapproved_users():
+    users = api.get_all_unapproved_users()
     return users
