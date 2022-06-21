@@ -88,24 +88,14 @@ app.layout = html.Div(
     Input('url', 'pathname'))
 
 def display_page(pathname):
-    if pathname == "/mlex_registration":
-        return mlex_registration.layout, pageregis_layout
-    if pathname == "/mlex_login":
-        return mlex_login.layout, pagelogin_layout
     if pathname == "/mlex_userhome":
-        # call verify user here -- read cookie, see if user is true. if false, return to login page.
-        #if user_id is true:
         return mlex_userhome.layout, loggedin_layout
-    if pathname == "/mlex_logout":
-        return mlex_logout.layout, default_layout
     if pathname == "/mlex_search":
         return html.Iframe("https://search.mlexchange.lbl.gov"), loggedin_layout
     if pathname == "/mlex_content":
         return html.Iframe("https://content.mlexchange.lbl.gov"), loggedin_layout
     if pathname == "/mlex_compute":
         return html.Iframe("https://compute.mlexchange.lbl.gov"), loggedin_layout
-    else:
-        return mlex_about.layout, default_layout
 
 
 # for testing interface
