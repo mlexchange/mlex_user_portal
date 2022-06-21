@@ -1,3 +1,4 @@
+from pickle import FALSE
 from neo4j import GraphDatabase, basic_auth
 
 class userAPI:
@@ -88,13 +89,14 @@ class userAPI:
     ### USERS ###
     def create_user(self, fname, lname, email, orcid):
         """ A function to add user node. Every user is assigned as Unapproved after sign-up. """
+        verbose = False
         test_query = '''
         MATCH (up:UserProfile {fname:$fname, lname:$lname, email:$email, orcid:$orcid})
         RETURN count(up) as counts
         '''
         counts = self.session.run(test_query, parameters={'fname':fname, 'lname':lname, 'email':email, 'orcid':orcid}).data()
         if counts[0].get('counts') > 0:
-            status = print('User already exists. Have user ask admin for support.')
+            status = 'User already exists. Have user ask admin for support.'
         else:
             cquery = '''
             match (u:user) return u
@@ -111,9 +113,11 @@ class userAPI:
             '''
             user_id = self.session.run(cquery, parameters=parameters).data()
             if user_id:
-                status = print("Account with user_id " + str(user_id[0].get('userid')) + " has been created!")
+                status = "Account with user_id " + str(user_id[0].get('userid')) + " has been created!"
             else:
-                status = print("[WARNING] An error occurred during user creation.")
+                status = "[WARNING] An error occurred during user creation."
+        if verbose:
+            print(status)
         return status
     
     def archive_user(self, uuid):
@@ -1278,9 +1282,9 @@ if __name__ == '__main__':
     #api.create_compute(name='Aardvark', hostname='aardvark.anl.gov', public=False, uuid='u_HKrish00003')
     #api.create_compute(name='Vaughan', hostname='vaughan.als.lbl.gov')
     #api.create_compute(name='NERSC-Perlmutter', hostname='perlmutter.nersc.gov')
-    api.add_user_to_compute(uuid='u_EHolman00002', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
-    api.add_user_to_compute(uuid='u_JSmith00004', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
-    api.remove_user_from_compute(uuid='u_EHolman00002', cname='MLSandbox', chostname='mlsandbox.als.lbl.gov')
+    api.add_user_to_compute(uuid='u_EHolman00002', chostname='mlsandbox.als.lbl.gov')
+    api.add_user_to_compute(uuid='u_JSmith00004', chostname='mlsandbox.als.lbl.gov')
+    api.remove_user_from_compute(uuid='u_EHolman00002', chostname='mlsandbox.als.lbl.gov')
 
     # Add Team
     api.delete_team(name='MLExchange_Team', owner='u_EHolman00002')
