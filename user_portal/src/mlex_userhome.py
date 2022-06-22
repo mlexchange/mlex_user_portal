@@ -483,7 +483,11 @@ layout = html.Div(
                         ])
                     ]
                 )
+<<<<<<< HEAD
             ),    
+=======
+            ),
+>>>>>>> 7682be4aff082d1be3520a13679776ea7446e86f
             dbc.Row(
                 dbc.Card(
                     children=[
