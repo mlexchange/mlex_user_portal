@@ -470,7 +470,44 @@ layout = html.Div(
                     ]
                 )
             ),
-            
+            dbc.Row(
+                dbc.Card(
+                    children=[
+                        dbc.CardHeader(html.H2("Computing Resources", style={"textAlign":"center"})),
+                        dbc.CardBody([
+                            html.Div(
+                                "Your accessible computing resources and respective role are listed below.",
+                                style={"width":"100%", "textAlign":"left"}),
+                            dbc.Row(compute_table),
+                            html.Div(
+                                "Please check the list of documented computing locations prior to submitting a request for a new " +
+                                "computing location to be added to the database. To add a private computing location to the database" +
+                                " for your teams, please visit the Compute tab.",
+                                style={"width":"100%", "textAlign":"left"}),
+                            html.Div(
+                                dbc.Row(dbc.InputGroup([
+                                    dbc.Col(dbc.Button(
+                                        "Access Management",
+                                        outline=True,
+                                        color="primary",
+                                        id="cr-manage",
+                                        style={"text-transform": "none", "width":"100%"}),
+                                        align="center"),
+                                    dbc.Col(dbc.Button(
+                                        "Private Computing",
+                                        outline=True,
+                                        color="primary",
+                                        id="compute-tab-button",
+                                        href="/mlex_compute",
+                                        style={"text-transform": "none", "width":"100%"}),
+                                    align="center")
+                                ])),
+                            style={'width':'100%', 'margin-top':'10px'}),
+                            dbc.Row(cr_manage_layout) # place collapse user tab here
+                        ])
+                    ]
+                )
+            )
         ])
     ],
 id="home_layout")
