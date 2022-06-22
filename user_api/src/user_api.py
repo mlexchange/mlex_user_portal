@@ -286,7 +286,10 @@ def get_users(user_id:str, first_name:Optional[str]=None, last_name:Optional[str
     users = api.get_users(kv, requestor=user_id)
     return users
 
-@app.get(API_URL_PREFIX + "/users/{user_id}/unapproved", tags=['users', 'unapproved'])
-def get_all_unapproved_users():
-    users = api.get_all_unapproved_users()
+@app.get(API_URL_PREFIX + "/requests/{requestor_id}/users/roles/unapproved/", tags=['requests', 'users', 'roles'])
+def get_all_unapproved_users(requestor_id:str):
+    role = api.get_role_for_user(requestor_id)
+    users = []
+    if role in ['Admin', 'MLE Admin']:
+        users = api.get_all_unapproved_users()
     return users

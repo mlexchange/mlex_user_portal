@@ -5,9 +5,9 @@ from dashapp import app
 import requests
 
 #--------------------------------------- App Layout Preparation ---------------------------------
-access_token = {'fname':'Mel',
-                'lname':'Exchange',
-                'user_id':'u_TInitial00005'}
+access_token = {'fname':'Hari',
+                'lname':'Krish',
+                'user_id':'u_HKrish00003'}
 
 fname = access_token.get('fname')
 lname = access_token.get('lname')
@@ -389,20 +389,19 @@ memberships = dbc.Collapse(
 )
 
 # Create unapproved users table
-unapproved_users_url = "https://user-api:5000/api/v0/users/" + str(user_id) + "/unapproved"
 unapproved_users_table = html.Div(
     children = [
         dash_table.DataTable(
             id='unapproved-user-table',
             columns = [
-                {'name': 'First Name', 'id': 'first_name'},
-                {'name': 'Last Name', 'id': 'last_name'},
+                {'name': 'First Name', 'id': 'fname'},
+                {'name': 'Last Name', 'id': 'lname'},
                 {'name': 'Active', 'id': 'active'},
                 {'name': 'ORCID', 'id': 'orcid'},
-                {'name': 'ID', 'id': 'id'},
+                {'name': 'ID', 'id': 'uuid'},
                 {'name': 'Email', 'id': 'email'},
                 ],
-            data = [], #requests.get(unapproved_users_url).json(),
+            data = [],
             fixed_rows = {'headers': True},
             css = [{"selector": ".show-hide", "rule": "display: none"}],
             style_table = {'overflowY': 'auto', 'overflowX': 'scroll'},
@@ -417,7 +416,7 @@ unapproved_users_table = html.Div(
             ]
         )
     ],
-    style = {'width': '100%', 'margin-top': '10px', 'margin-bottom': '10px'}
+    style = {"width":"100%"}
 )
 
 unapproved_users_button = [
@@ -430,9 +429,6 @@ unapproved_users_button = [
             style={"text-transform": "none", "width":"100%"}), align="left"),
     ])
 ]
-
-
-
 #--------------------------------------- App Layout ---------------------------------
 # Setting up initial webpage layout
 layout = html.Div(
@@ -446,6 +442,24 @@ layout = html.Div(
                             style={"width":"100%", "textAlign":"left", "vertical-align":"bottom"})
                     ])
                 )
+            )
+        ]),
+        dbc.Container([
+            dbc.Row(
+                # id='unapproved-table',
+                children=[
+                    dbc.CardHeader(html.H2("Administrative Tasks", style={"textAlign":"center"})),
+                    dbc.CardBody([
+                        html.Div(
+                            "This section exists to create project teams consisting of appropriate users who have registered and " +
+                            "have been approved to use MLExchange resources. Please use the buttons below to navigate through team" + 
+                            " creation and team membership management. Note that the goal of teams is to serve as a method of controlling" +
+                            "  user access to owned assets relating to MLExchange.",
+                            style={"width":"100%", "textAlign":"left"}),
+                        dbc.Row(html.Div(unapproved_users_table, style={'width':'100%', 'margin-top':'10px', 'margin-bottom':'10px'})),
+                        dbc.Row(html.Div(unapproved_users_button, style={'width':'100%', 'margin-bottom':'10px'}))
+                    ])
+                ]
             )
         ]),
         dbc.Container([
@@ -469,16 +483,66 @@ layout = html.Div(
                         ])
                     ]
                 )
-            ),
-            
+            ),    
+            dbc.Row(
+                dbc.Card(
+                    children=[
+                        dbc.CardHeader(html.H2("Computing Resources", style={"textAlign":"center"})),
+                        dbc.CardBody([
+                            html.Div(
+                                "Your accessible computing resources and respective role are listed below.",
+                                style={"width":"100%", "textAlign":"left"}),
+                            dbc.Row(compute_table),
+                            html.Div(
+                                "Please check the list of documented computing locations prior to submitting a request for a new " +
+                                "computing location to be added to the database. To add a private computing location to the database" +
+                                " for your teams, please visit the Compute tab.",
+                                style={"width":"100%", "textAlign":"left"}),
+                            html.Div(
+                                dbc.Row(dbc.InputGroup([
+                                    dbc.Col(dbc.Button(
+                                        "Access Management",
+                                        outline=True,
+                                        color="primary",
+                                        id="cr-manage",
+                                        style={"text-transform": "none", "width":"100%"}),
+                                        align="center"),
+                                    dbc.Col(dbc.Button(
+                                        "Private Computing",
+                                        outline=True,
+                                        color="primary",
+                                        id="compute-tab-button",
+                                        href="/mlex_compute",
+                                        style={"text-transform": "none", "width":"100%"}),
+                                    align="center")
+                                ])),
+                            style={'width':'100%', 'margin-top':'10px'}),
+                            dbc.Row(cr_manage_layout) # place collapse user tab here
+                        ])
+                    ]
+                )
+            )
         ])
     ],
 id="home_layout")
 
 ## REACTIVE CALLBACKS ##
-#@app.callback(
-#    Output('unapproved-user-table', 'is_open')
-#    Input('', 
+@app.callback(
+   Output('unapproved-user-table', 'data'),
+#    Output('unapproved-table', 'is_open'),
+   Input('show-unapproved-users', 'n_clicks'),
+   prevent_initial_call=True
+)
+
+def display_unapproved_table(n1):
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+    unapproved_users_url = "http://user-api:5000/api/v0/requests/" + str(user_id) + "/users/roles/unapproved/"
+
+    data_unapproved = requests.get(unapproved_users_url).json()
+    
+    if 'show-unapproved-users' in changed_id:
+        return data_unapproved
+
 
 @app.callback(
     Output('team-table', 'data'),
@@ -490,11 +554,12 @@ id="home_layout")
     prevent_initial_call=True
 )
 
-def update_team_table(n1, n2):
+def update_team_management_tabs(n1, n2):
     '''
-    This callback updates the team membership tab in the mlex_userhome layout
+    This callback updates the team membership table in the mlex_userhome layout
+    while opening the appropriate tabs which are based in collapsable containers.
     Returns:
-        team-table:     Updates the user's membership table
+        team-table:     Updates the user's membership table with data_table.
     '''
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
     membership_url = "http://user-api:5000/api/v0/users/" + str(user_id) + "/teams/"
@@ -596,7 +661,7 @@ def rem_from_team(n, email, tname):
     prevent_initial_call=True
 )
 
-def update_team_table(n, tname):
+def update_team_table_membership(n, tname):
     '''
     This callback updates the team membership tab in the mlex_userhome layout
     Returns:
