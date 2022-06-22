@@ -388,6 +388,51 @@ memberships = dbc.Collapse(
     style={"width":"100%"}
 )
 
+# Create unapproved users table
+unapproved_users_url = "https://user-api:5000/api/v0/users/" + str(user_id) + "/unapproved"
+unapproved_users_table = html.Div(
+    children = [
+        dash_table.DataTable(
+            id='unapproved-user-table',
+            columns = [
+                {'name': 'First Name', 'id': 'first_name'},
+                {'name': 'Last Name', 'id': 'last_name'},
+                {'name': 'Active', 'id': 'active'},
+                {'name': 'ORCID', 'id': 'orcid'},
+                {'name': 'ID', 'id': 'id'},
+                {'name': 'Email', 'id': 'email'},
+                ],
+            data = [], #requests.get(unapproved_users_url).json(),
+            fixed_rows = {'headers': True},
+            css = [{"selector": ".show-hide", "rule": "display: none"}],
+            style_table = {'overflowY': 'auto', 'overflowX': 'scroll'},
+            style_cell = {'font_family': 'arial', 'textAlign': 'center'},
+            style_header = {'fontWeight': 'bold'},
+            style_data_conditional = [
+                {
+                    "if" : {"state": "selected"},
+                    "backgroundColor": "inherit !important",
+                    "border": "inherit !important",
+                }
+            ]
+        )
+    ],
+    style = {'width': '100%', 'margin-top': '10px', 'margin-bottom': '10px'}
+)
+
+unapproved_users_button = [
+    dbc.InputGroup([
+        dbc.Col(dbc.Button(
+            "Show Unapproved Users",
+            outline=True,
+            color="primary",
+            id="show-unapproved-users",
+            style={"text-transform": "none", "width":"100%"}), align="left"),
+    ])
+]
+
+
+
 #--------------------------------------- App Layout ---------------------------------
 # Setting up initial webpage layout
 layout = html.Div(
@@ -424,50 +469,17 @@ layout = html.Div(
                         ])
                     ]
                 )
-            ),    
-            dbc.Row(
-                dbc.Card(
-                    children=[
-                        dbc.CardHeader(html.H2("Computing Resources", style={"textAlign":"center"})),
-                        dbc.CardBody([
-                            html.Div(
-                                "Your accessible computing resources and respective role are listed below.",
-                                style={"width":"100%", "textAlign":"left"}),
-                            dbc.Row(compute_table),
-                            html.Div(
-                                "Please check the list of documented computing locations prior to submitting a request for a new " +
-                                "computing location to be added to the database. To add a private computing location to the database" +
-                                " for your teams, please visit the Compute tab.",
-                                style={"width":"100%", "textAlign":"left"}),
-                            html.Div(
-                                dbc.Row(dbc.InputGroup([
-                                    dbc.Col(dbc.Button(
-                                        "Access Management",
-                                        outline=True,
-                                        color="primary",
-                                        id="cr-manage",
-                                        style={"text-transform": "none", "width":"100%"}),
-                                        align="center"),
-                                    dbc.Col(dbc.Button(
-                                        "Private Computing",
-                                        outline=True,
-                                        color="primary",
-                                        id="compute-tab-button",
-                                        href="/mlex_compute",
-                                        style={"text-transform": "none", "width":"100%"}),
-                                    align="center")
-                                ])),
-                            style={'width':'100%', 'margin-top':'10px'}),
-                            dbc.Row(cr_manage_layout) # place collapse user tab here
-                        ])
-                    ]
-                )
-            )
+            ),
+            
         ])
     ],
 id="home_layout")
 
 ## REACTIVE CALLBACKS ##
+#@app.callback(
+#    Output('unapproved-user-table', 'is_open')
+#    Input('', 
+
 @app.callback(
     Output('team-table', 'data'),
     Output('mem-table', 'is_open'),

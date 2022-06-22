@@ -9,7 +9,7 @@ import mlex_login
 import mlex_userhome
 import mlex_about
 import mlex_logout
-import mlex_adminhome
+#import mlex_adminhome
 
 user_id = "u_HKrish00003"
 
@@ -32,7 +32,7 @@ pageregis_layout = [dbc.Row([
     html.Div(dcc.Link('About', href='/mlex_about'), style={'width':'60px', 'display':'inline-block'}),
     html.Div(dcc.Link('Login', href='/mlex_login'), style={'width':'60px', 'display':'inline-block'})])]
 
-header = dbc.Navbar(    
+header = dbc.Navbar(
     dbc.Container(
         [
             dbc.Row(
@@ -98,8 +98,8 @@ def display_page(pathname):
         return html.Iframe("https://content.mlexchange.lbl.gov"), loggedin_layout
     if pathname == "/mlex_compute":
         return html.Iframe("https://compute.mlexchange.lbl.gov"), loggedin_layout
-    if pathname == "/mlex_userhome" and role == "Admin":
-        return mlex_adminhome.layout, loggedin_layout
+    #if pathname == "/mlex_userhome" and role == "Admin":
+    #    return mlex_adminhome.layout, loggedin_layout
 
 
 # for testing interface
