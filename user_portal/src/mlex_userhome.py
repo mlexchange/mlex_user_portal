@@ -431,21 +431,14 @@ unapproved_users_button = [
 ]
 #--------------------------------------- App Layout ---------------------------------
 # Setting up initial webpage layout
-layout = html.Div(
-    [
-        dbc.Container([
+
+def generate_layout(is_admin):
+
+  admin_section = dbc.Container([])
+
+  if is_admin:
+      admin_section = dbc.Container([
             dbc.Row(
-                dbc.Card(
-                    dbc.CardBody([
-                        html.Div(
-                            html.H1("Welcome back, " + str(fname) + " " + str(lname) + "!"),
-                            style={"width":"100%", "textAlign":"left", "vertical-align":"bottom"})
-                    ])
-                )
-            )
-        ]),
-        dbc.Container([
-            dbc.Collapse(
                 id='admin-tab',
                 children=[
                     dbc.CardHeader(html.H2("Administrative Tasks", style={"textAlign":"center"})),
@@ -459,7 +452,22 @@ layout = html.Div(
                     ])
                 ]
             )
+        ])
+
+  layout = html.Div(
+    [
+        dbc.Container([
+            dbc.Row(
+                dbc.Card(
+                    dbc.CardBody([
+                        html.Div(
+                            html.H1("Welcome back, " + str(fname) + " " + str(lname) + "!"),
+                            style={"width":"100%", "textAlign":"left", "vertical-align":"bottom"})
+                    ])
+                )
+            )
         ]),
+        admin_section,
         dbc.Container([
             dbc.Row(
                 dbc.Card(
@@ -522,23 +530,11 @@ layout = html.Div(
             )
         ])
     ],
-id="home_layout")
+  id="home_layout")
+
+  return layout
 
 ## REACTIVE CALLBACKS ##
-@app.callback(
-    Output('admin-tab', 'is_open'),
-    Output('output', 'children'),
-    [Input('input', 'value')]
-)
-
-def update_output(value):
-    """
-    Takes cookie and stores the information to load appropriate containers.
-    """
-    dash.callback_context.response.set_cookie(
-        'dash cookie', value + ' - cookie')
-    
-    return value + ' - output'
 
 @app.callback(
    Output('unapproved-user-table', 'data'),

@@ -11,7 +11,8 @@ import mlex_about
 import mlex_logout
 #import mlex_adminhome
 
-user_id = "u_HKrish00003"
+import flask
+import base64
 
 default_layout = [dbc.Row([
     html.Div(dcc.Link('Login', href='/mlex_login'), style={'width':'60px', 'display':'inline-block'}),
@@ -89,18 +90,36 @@ app.layout = html.Div(
     Input('url', 'pathname'))
 
 def display_page(pathname):
-    role = "http://user-api:5000/api/v0/requests/users/" + str(user_id) + "roles/"
-    if pathname == "/mlex_userhome":
-        return mlex_userhome.layout, loggedin_layout
+    
+    try:
+
+      token = flask.request.cookies.get('mlexchange_token')
+      print("TOKEN", token)
+
+      token = token.split(".")
+      print(base64.b64decode(token[0]))
+      print(base64.b64decode(token[2]))
+
+    except Exception as e:
+        print(e)
+
+    user_id = "u_HKrish00003"
+    # role = "http://user-api:5000/api/v0/requests/users/" + str(user_id) + "roles/"
+
+    is_admin = False
+
+    #if user_id == "u_HKrish00003":
+    #    is_admin = True
+
     if pathname == "/mlex_search":
         return html.Iframe("https://search.mlexchange.lbl.gov"), loggedin_layout
     if pathname == "/mlex_content":
         return html.Iframe("https://content.mlexchange.lbl.gov"), loggedin_layout
     if pathname == "/mlex_compute":
         return html.Iframe("https://compute.mlexchange.lbl.gov"), loggedin_layout
-    #if pathname == "/mlex_userhome" and role == "Admin":
-    #    return mlex_adminhome.layout, loggedin_layout
 
+    # return mlex_userhome.layout, loggedin_layout
+    return mlex_userhome.generate_layout(is_admin), loggedin_layout
 
 # for testing interface
 if __name__ == "__main__":
