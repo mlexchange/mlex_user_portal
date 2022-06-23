@@ -445,16 +445,14 @@ layout = html.Div(
             )
         ]),
         dbc.Container([
-            dbc.Row(
-                # id='unapproved-table',
+            dbc.Collapse(
+                id='admin-tab',
                 children=[
                     dbc.CardHeader(html.H2("Administrative Tasks", style={"textAlign":"center"})),
                     dbc.CardBody([
                         html.Div(
-                            "This section exists to create project teams consisting of appropriate users who have registered and " +
-                            "have been approved to use MLExchange resources. Please use the buttons below to navigate through team" + 
-                            " creation and team membership management. Note that the goal of teams is to serve as a method of controlling" +
-                            "  user access to owned assets relating to MLExchange.",
+                            "This is the administrative tab only available to Admin and MLE Admin roles. Unapproved users requesting" +
+                            " access to MLExchange are listed in the table below for processing.",
                             style={"width":"100%", "textAlign":"left"}),
                         dbc.Row(html.Div(unapproved_users_table, style={'width':'100%', 'margin-top':'10px', 'margin-bottom':'10px'})),
                         dbc.Row(html.Div(unapproved_users_button, style={'width':'100%', 'margin-bottom':'10px'}))
@@ -483,11 +481,7 @@ layout = html.Div(
                         ])
                     ]
                 )
-<<<<<<< HEAD
-            ),    
-=======
             ),
->>>>>>> 7682be4aff082d1be3520a13679776ea7446e86f
             dbc.Row(
                 dbc.Card(
                     children=[
@@ -532,8 +526,22 @@ id="home_layout")
 
 ## REACTIVE CALLBACKS ##
 @app.callback(
+    Output('admin-tab', 'is_open'),
+    Output('output', 'children'),
+    [Input('input', 'value')]
+)
+
+def update_output(value):
+    """
+    Takes cookie and stores the information to load appropriate containers.
+    """
+    dash.callback_context.response.set_cookie(
+        'dash cookie', value + ' - cookie')
+    
+    return value + ' - output'
+
+@app.callback(
    Output('unapproved-user-table', 'data'),
-#    Output('unapproved-table', 'is_open'),
    Input('show-unapproved-users', 'n_clicks'),
    prevent_initial_call=True
 )
