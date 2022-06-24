@@ -4,8 +4,8 @@
 set -e
 
 # Wait for the backend to be up, if we know where it is.
-if [ -n "$USER_API" ]; then
-  /app/work/wait-for-it.sh -t 45 "$USER_API"
+if [ -n "$NEO4J_API" ]; then
+  /wait-for-it.sh -t 45 "$NEO4J_API"
 fi
 
 # Run the main container command.

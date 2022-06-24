@@ -1,17 +1,10 @@
 from dash import Dash, callback, callback_context, html, dcc, dash_table, Input, Output, State, MATCH, ALL
 import dash_bootstrap_components as dbc
 
-from dashapp import app
+from dashapp import app, USER_API_ADDR, get_user_info
 import requests
 
 #--------------------------------------- App Layout Preparation ---------------------------------
-access_token = {'fname':'Hari',
-                'lname':'Krish',
-                'user_id':'u_HKrish00003'}
-
-fname = access_token.get('fname')
-lname = access_token.get('lname')
-user_id = access_token.get('user_id')
 
 # Create buttons for team management navigation
 team_input_groups = [
@@ -32,9 +25,11 @@ team_input_groups = [
 ]
 
 # Create compute_table container
-compute_url = "http://user-api:5000/api/v0/users/" + str(user_id) + "/compute/"
 
-compute_table = html.Div(
+def generate_compute_table(user_id):
+  compute_url = USER_API_ADDR + "/api/v0/users/" + str(user_id) + "/compute/"
+
+  compute_table = html.Div(
     children = [
         dash_table.DataTable(
             id='compute-table',
@@ -58,7 +53,8 @@ compute_table = html.Div(
             ]
         )
     ],
-style={'width':'100%', 'margin-top':'10px', 'margin-bottom':'10px'})
+  style={'width':'100%', 'margin-top':'10px', 'margin-bottom':'10px'})
+  return compute_table
 
 # Create users with compute resource access container
 cr_members = dbc.Collapse(
@@ -184,10 +180,12 @@ cr_manage_layout = dbc.Collapse(
 )
 
 # Create manage_team container
-team_manage_url = "http://user-api:5000/api/v0/users/" + str(user_id) + "/teams/owned"
-team_list = requests.get(team_manage_url).text
 
-t_team_layout = dbc.Collapse(
+def generate_team_layout(user_id):
+  team_manage_url = USER_API_ADDR + "/api/v0/users/" + str(user_id) + "/teams/owned"
+  team_list = requests.get(team_manage_url).text
+
+  t_team_layout = dbc.Collapse(
     id='t-team-tab',
     children=[
         html.Div(html.H4("Create Teams")),
@@ -236,7 +234,8 @@ t_team_layout = dbc.Collapse(
             dbc.Row(html.Div(id='del-team-output', style={"width":"100%", "textAlign":"center"}))
         ])
     ]
-)
+  )
+  return t_team_layout
 
 # Create manage_members container
 # owned_teams_url = "http://user-api:5000/api/v0/users/" + str(user_id) + "/teams/owned"
@@ -432,9 +431,12 @@ unapproved_users_button = [
 #--------------------------------------- App Layout ---------------------------------
 # Setting up initial webpage layout
 
-def generate_layout(is_admin):
+def generate_layout(fname, lname, user_id, is_admin):
 
   admin_section = dbc.Container([])
+
+  t_team_layout = generate_team_layout(user_id)
+  compute_table = generate_compute_table(user_id)
 
   if is_admin:
       admin_section = dbc.Container([
@@ -543,8 +545,10 @@ def generate_layout(is_admin):
 )
 
 def display_unapproved_table(n1):
+    user_id = get_user_info()["user_id"]
+
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
-    unapproved_users_url = "http://user-api:5000/api/v0/requests/" + str(user_id) + "/users/roles/unapproved/"
+    unapproved_users_url = USER_API_ADDR + "/api/v0/requests/" + str(user_id) + "/users/roles/unapproved/"
 
     data_unapproved = requests.get(unapproved_users_url).json()
     
@@ -569,8 +573,10 @@ def update_team_management_tabs(n1, n2):
     Returns:
         team-table:     Updates the user's membership table with data_table.
     '''
+
+    user_id = get_user_info()["user_id"]
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
-    membership_url = "http://user-api:5000/api/v0/users/" + str(user_id) + "/teams/"
+    membership_url = USER_API_ADDR + "/api/v0/users/" + str(user_id) + "/teams/"
 
     data_table = requests.get(membership_url).json()
 
@@ -588,9 +594,10 @@ def update_team_management_tabs(n1, n2):
     )
 
 def create_team(n, tname):
+    user_id = get_user_info()["user_id"]
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
 
-    url = "http://user-api:5000/api/v0/teams/name/" + str(tname) + "/owner/" + str(user_id)
+    url = USER_API_ADDR + "/api/v0/teams/name/" + str(tname) + "/owner/" + str(user_id)
     if n == None:
         return "", "test"
     if "new-team" in changed_id:
@@ -608,8 +615,9 @@ def create_team(n, tname):
     )
 
 def delete_team(n, tname):
+    user_id = get_user_info()["user_id"]
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
-    url = "http://user-api:5000/api/v0/teams/owner/" + str(user_id) + "/name/" + str(tname)
+    url = USER_API_ADDR + "/api/v0/teams/owner/" + str(user_id) + "/name/" + str(tname)
     if n == None:
         return "", "test"
     if "del-team" in changed_id:
@@ -630,8 +638,9 @@ def delete_team(n, tname):
 
 def add_to_team(n, email, tname):
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+    user_id = get_user_info()["user_id"]
 
-    url = "http://user-api:5000/api/v0/users/" + str(email) + "/teams/name/" + str(tname) + "/owner/" + str(user_id)
+    url = USER_API_ADDR + "/api/v0/users/" + str(email) + "/teams/name/" + str(tname) + "/owner/" + str(user_id)
     if n == None:
         return "", "test"
     if "add-to-team" in changed_id:
@@ -651,8 +660,9 @@ def add_to_team(n, email, tname):
 
 def rem_from_team(n, email, tname):
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+    user_id = get_user_info()["user_id"]
 
-    url = "http://user-api:5000/api/v0/users/" + str(email) + "/teams/owner/" + str(user_id) + "/name/" + str(tname)
+    url = USER_API_ADDR + "/api/v0/users/" + str(email) + "/teams/owner/" + str(user_id) + "/name/" + str(tname)
     if n == None:
         return "", "test"
     if "rem-from-team" in changed_id:
@@ -675,10 +685,11 @@ def update_team_table_membership(n, tname):
     Returns:
         team-table:     Updates the user's membership table
     '''
+    user_id = get_user_info()["user_id"]
     is_open = False
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
     
-    url = "http://user-api:5000/api/v0/teams/name/" + str(tname) + "/owner/" + str(user_id)
+    url = USER_API_ADDR + "/api/v0/teams/name/" + str(tname) + "/owner/" + str(user_id)
     data_table = requests.get(url).json()
     if 'view-team' in changed_id:
         is_open = True
@@ -698,10 +709,11 @@ def update_cr_table(n, hostname):
     Returns:
         cr-mem-table:     Updates the compute resource's user table
     '''
+    user_id = get_user_info()["user_id"]
     is_open = False
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
     
-    url = "http://user-api:5000/api/v0/requests/" + str(user_id) + "/compute/" + str(hostname) + "/users/"
+    url = USER_API_ADDR + "/api/v0/requests/" + str(user_id) + "/compute/" + str(hostname) + "/users/"
     data_table = requests.get(url).json()
     if 'view-cr' in changed_id:
         is_open = True
@@ -736,8 +748,8 @@ def open_cr_manage(n):
 
 def add_to_compute(n, email, hostname):
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
-
-    url = "http://user-api:5000/api/v0/requests/" + str(user_id) + "/users/" + str(email) + "/compute/hostname/" + str(hostname)
+    user_id = get_user_info()["user_id"]
+    url = USER_API_ADDR + "/api/v0/requests/" + str(user_id) + "/users/" + str(email) + "/compute/hostname/" + str(hostname)
     if n == None:
         return "", "test"
     if "add-to-cr" in changed_id:
@@ -757,8 +769,9 @@ def add_to_compute(n, email, hostname):
 
 def rem_from_compute(n, email, hostname):
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+    user_id = get_user_info()["user_id"]
 
-    url = "http://user-api:5000/api/v0/requests/" + str(user_id) + "/users/" + str(email) + "/compute/hostname/" + str(hostname)
+    url = USER_API_ADDR + "/api/v0/requests/" + str(user_id) + "/users/" + str(email) + "/compute/hostname/" + str(hostname)
     if n == None:
         return "", "test"
     if "rem-from-cr" in changed_id:

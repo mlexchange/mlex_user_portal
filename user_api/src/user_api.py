@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 
 from user import userAPI
 
+import os
+
 API_URL_PREFIX = "/api/v0"
 
 app = FastAPI(  openapi_url ="/api/lbl-mlexchange/openapi.json",
@@ -12,7 +14,8 @@ app = FastAPI(  openapi_url ="/api/lbl-mlexchange/openapi.json",
                 redoc_url   ="/api/lbl-mlexchange/redoc",
              )
 
-api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
+#api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
+api = userAPI(url="bolt://neo4j", auth=("neo4j", os.environ["NEO4J_PASSWORD"]))
 
 ### ROLES ###
 @app.post(API_URL_PREFIX + "/roles", tags=['roles'])
@@ -187,6 +190,17 @@ def create_user_asset(asset_regis: UserAssetRegis, user_id:str):
 def delete_user_asset(userasset_id:str, user_id:str):
     status = api.delete_user_asset(uauid=userasset_id, owner=user_id)
     return status
+
+@app.get(API_URL_PREFIX + "/requests/{requestor_id}/users/{email}/metadata/", tags=['requests', 'users', 'metadata'])
+def get_uuid_from_email(requestor_id: str, email:str):
+    # in case user_id was email
+    role = api.get_role_for_user(requestor_id)
+    if role in ['Admin','MLE Admin']:
+        user_id = str(api.get_uuid_from_email(email))
+        userid_metadata = api.get_metadata_for_user(user_id)
+    else:
+        userid_metadata = []
+    return userid_metadata
 
 ### GET NEO4J DB INFORMATION ###
 @app.get(API_URL_PREFIX + "/requests/users/{user_id}/roles/", tags=['requests', 'users', 'roles'])

@@ -1,5 +1,6 @@
 from pickle import FALSE
 from neo4j import GraphDatabase, basic_auth
+import os
 
 class userAPI:
 
@@ -1243,7 +1244,9 @@ class userAPI:
         return users
 
 if __name__ == '__main__':
-    api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
+    # api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
+    api = userAPI(url="bolt://neo4j", auth=("neo4j", os.environ["NEO4J_PASSWORD"]))
+
     #api = userAPI(url="bolt://35.172.250.196:7687", auth=("neo4j", "interior-discrepancies-hair"))
     #kv = {'fname': None, 'lname': None, 'uuid': None, 'email': None}
     #api.get_users(kv, requestor='u_HYanxon00001')
@@ -1272,7 +1275,7 @@ if __name__ == '__main__':
     api.add_user_to_role('u_HYanxon00001','MLE Admin')
     api.create_user('Elizabeth', 'Holman', 'liz@gmail.com', '987-123-456-0')        # uuid: u_EHolman00002
     api.add_user_to_role('u_EHolman00002','MLE Admin')
-    api.create_user('Hari', 'Krish', 'krish@gmail.com', '345-671-289-0')            # uuid: u_HKrish00003
+    api.create_user('Hari', 'Krishnan', 'krish@gmail.com', '345-671-289-0')            # uuid: u_HKrish00003
     api.add_user_to_role('u_HKrish00003','Admin')
     api.create_user('John', 'Smith', 'smithj123@gmail.com', '333-444-555-1')        # uuid: u_JSmith00004
     api.add_user_to_role('u_JSmith00004', 'MLE User')

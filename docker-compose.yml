@@ -1,11 +1,26 @@
 version: "3.9"
 
 services:
+  neo4j:
+    # container_name: "neo4j"
+    image: neo4j
+    #expose:
+    #  - 7687
+    ports:
+      - "7473:7473"
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - "./data/neo4j:/data"
+    environment:
+      - NEO4J_AUTH=neo4j/MsQID79KFQuS
+      - NEO4JLABS_PLUGINS=["apoc"]
+
   front-end:
     depends_on:
       - user-api
-    restart: "unless-stopped"
-    container_name: "user-portal"
+        #restart: "unless-stopped"
+        #container_name: "user-portal"
     build:
       context: 'user_portal/'
       dockerfile: 'docker/Dockerfile'
@@ -15,17 +30,24 @@ services:
     ports:
       - '8050:8050'
     environment:
-      - USER_API=user-api
+      - USER_API=user-api:5000
+      - NEO4J_PASSWORD=MsQID79KFQuS
 
   user-api:
-      restart: "unless-stopped"
-      container_name: "user-api"
-      build:
-        context: "user_api/"
-        dockerfile: "docker/Dockerfile"
-      volumes:
-        - ./user_api/src:/app/api/src
-      expose:
-        - "5000"
-      ports:
-        - "5000:5000"
+          #restart: "unless-stopped"
+          #container_name: "user-api"
+    build:
+      context: "user_api/"
+      dockerfile: "docker/Dockerfile"
+    volumes:
+      - ./user_api/src:/app/api/src
+    expose:
+      - "5000"
+    ports:
+      - "5000:5000"
+    environment:
+      - NEO4J_PASSWORD=MsQID79KFQuS
+      - NEO4J_API=neo4j:7687
+    depends_on:
+      - neo4j
+
