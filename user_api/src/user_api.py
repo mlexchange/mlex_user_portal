@@ -1,6 +1,5 @@
-from typing import List, Optional
-
 from fastapi import FastAPI
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from user import userAPI
@@ -12,7 +11,8 @@ app = FastAPI(  openapi_url ="/api/lbl-mlexchange/openapi.json",
                 redoc_url   ="/api/lbl-mlexchange/redoc",
              )
 
-api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
+#api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
+api = userAPI(url="bolt://35.172.250.29:7687", auth=("neo4j", "symbols-exposures-keyboards"))
 
 ### ROLES ###
 @app.post(API_URL_PREFIX + "/roles", tags=['roles'])
@@ -194,6 +194,20 @@ def get_role_for_user(user_id:str):
     role = api.get_role_for_user(user_id)
     return role
 
+class UserList(BaseModel):
+    users: str
+
+@app.post(API_URL_PREFIX + "/requests/users/{user_id}/roles/", tags=['requests', 'users', 'roles']) #, response_model=UserList)
+async def change_role_for_users(user_id: str, user_list: UserList):
+    role = 'MLE User'
+    requestor_role = api.get_role_for_user(user_id)
+    status = None
+    if requestor_role in ['Admin','MLE Admin']:
+        users = user_list.users.split()
+        for user in users:
+            status = add_user_to_role(user, role)
+    return status
+
 @app.get(API_URL_PREFIX + "/requests/{requestor_id}/users/{user_id}/content/", tags=['requests', 'users', 'content'])
 def get_content_for_user(requestor_id:str, user_id:str):
     role = api.get_role_for_user(requestor_id)
@@ -287,7 +301,7 @@ def get_users(user_id:str, first_name:Optional[str]=None, last_name:Optional[str
     return users
 
 @app.get(API_URL_PREFIX + "/requests/{requestor_id}/users/roles/unapproved/", tags=['requests', 'users', 'roles'])
-def get_all_unapproved_users(requestor_id:str):
+async def get_all_unapproved_users(requestor_id:str):
     role = api.get_role_for_user(requestor_id)
     users = []
     if role in ['Admin', 'MLE Admin']:
