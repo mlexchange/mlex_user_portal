@@ -1,6 +1,5 @@
 from dash import Dash, callback, callback_context, html, dcc, dash_table, Input, Output, State, MATCH, ALL
 import dash_bootstrap_components as dbc
-
 from dashapp import app
 import requests
 
@@ -402,6 +401,9 @@ unapproved_users_table = html.Div(
                 {'name': 'Email', 'id': 'email'},
                 ],
             data = [],
+            row_selectable="multi",
+            row_deletable=True,
+            selected_rows=[],
             fixed_rows = {'headers': True},
             css = [{"selector": ".show-hide", "rule": "display: none"}],
             style_table = {'overflowY': 'auto', 'overflowX': 'scroll'},
@@ -427,8 +429,15 @@ unapproved_users_button = [
             color="primary",
             id="show-unapproved-users",
             style={"text-transform": "none", "width":"100%"}), align="left"),
+        dbc.Col(dbc.Button(
+            "Approve Users",
+            outline=True,
+            color="primary",
+            id="approve-users",
+            style={"text-transform": "none", "width":"100%"}), align="right"),
     ])
 ]
+
 #--------------------------------------- App Layout ---------------------------------
 # Setting up initial webpage layout
 layout = html.Div(
@@ -445,14 +454,16 @@ layout = html.Div(
             )
         ]),
         dbc.Container([
-            dbc.Collapse(
-                id='admin-tab',
+            dbc.Row(
+                # id='unapproved-table',
                 children=[
                     dbc.CardHeader(html.H2("Administrative Tasks", style={"textAlign":"center"})),
                     dbc.CardBody([
                         html.Div(
-                            "This is the administrative tab only available to Admin and MLE Admin roles. Unapproved users requesting" +
-                            " access to MLExchange are listed in the table below for processing.",
+                            "This section exists to create project teams consisting of appropriate users who have registered and " +
+                            "have been approved to use MLExchange resources. Please use the buttons below to navigate through team" +
+                            " creation and team membership management. Note that the goal of teams is to serve as a method of controlling" +
+                            "  user access to owned assets relating to MLExchange.",
                             style={"width":"100%", "textAlign":"left"}),
                         dbc.Row(html.Div(unapproved_users_table, style={'width':'100%', 'margin-top':'10px', 'margin-bottom':'10px'})),
                         dbc.Row(html.Div(unapproved_users_button, style={'width':'100%', 'margin-bottom':'10px'}))
@@ -468,7 +479,7 @@ layout = html.Div(
                         dbc.CardBody([
                             html.Div(
                                 "This section exists to create project teams consisting of appropriate users who have registered and " +
-                                "have been approved to use MLExchange resources. Please use the buttons below to navigate through team" + 
+                                "have been approved to use MLExchange resources. Please use the buttons below to navigate through team" +
                                 " creation and team membership management. Note that the goal of teams is to serve as a method of controlling" +
                                 "  user access to owned assets relating to MLExchange.",
                                 style={"width":"100%", "textAlign":"left"}),
@@ -526,35 +537,31 @@ id="home_layout")
 
 ## REACTIVE CALLBACKS ##
 @app.callback(
-    Output('admin-tab', 'is_open'),
-    Output('output', 'children'),
-    [Input('input', 'value')]
-)
-
-def update_output(value):
-    """
-    Takes cookie and stores the information to load appropriate containers.
-    """
-    dash.callback_context.response.set_cookie(
-        'dash cookie', value + ' - cookie')
-    
-    return value + ' - output'
-
-@app.callback(
    Output('unapproved-user-table', 'data'),
    Input('show-unapproved-users', 'n_clicks'),
+   Input('approve-users', 'n_clicks'),
+   State('unapproved-user-table', 'data'),
+   State('unapproved-user-table', 'derived_virtual_selected_rows'), #[1,2]
    prevent_initial_call=True
 )
-
-def display_unapproved_table(n1):
+def display_unapproved_table(n1, n2, data, selected_rows):
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
-    unapproved_users_url = "http://user-api:5000/api/v0/requests/" + str(user_id) + "/users/roles/unapproved/"
 
-    data_unapproved = requests.get(unapproved_users_url).json()
-    
     if 'show-unapproved-users' in changed_id:
+        unapproved_users_url = "http://user-api:5000/api/v0/requests/" + str(user_id) + "/users/roles/unapproved/"
+        data_unapproved = requests.get(unapproved_users_url).json()
         return data_unapproved
 
+    if 'approve-users' in changed_id:
+        list_ids = [data[i]['uuid'] for i in selected_rows]
+        ids = {'users': ' '.join(list_ids)}
+        url0 = "http://user-api:5000/api/v0/requests/users/" + str(user_id) + "/roles/"
+        status = requests.post(url0, json=ids)
+
+        unapproved_users_url = "http://user-api:5000/api/v0/requests/" + str(user_id) + "/users/roles/unapproved/"
+        data_unapproved = requests.get(unapproved_users_url).json()
+
+        return data_unapproved
 
 @app.callback(
     Output('team-table', 'data'),
@@ -732,8 +739,8 @@ def open_cr_manage(n):
 @app.callback(
     Output("add-user-output", "children"),
     Input("add-to-cr", "n_clicks"),
-    State("add-user-email","value"),
-    State("add-user-hostname","value"),
+    State("add-user-email", "value"),
+    State("add-user-hostname", "value"),
     prevent_initial_call=True,
     suppress_callback_exceptions=True
     )
