@@ -401,7 +401,6 @@ unapproved_users_table = html.Div(
                 {'name': 'Email', 'id': 'email'},
                 ],
             data = [],
-            editable=True,
             filter_action="native",
             sort_action="native",
             sort_mode='multi',
