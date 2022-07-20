@@ -1244,7 +1244,7 @@ class userAPI:
 
 if __name__ == '__main__':
     api = userAPI(url="neo4j+s://44bb2475.databases.neo4j.io", auth=("neo4j", "n04yHsQNfrl_f72g79zqMO8xVU2UvUsNJsafcZMtCFM"))
-    #api = userAPI(url="bolt://35.172.250.196:7687", auth=("neo4j", "interior-discrepancies-hair"))
+    #api = userAPI(url="bolt://35.172.250.29:7687", auth=("neo4j", "symbols-exposures-keyboards"))
     #kv = {'fname': None, 'lname': None, 'uuid': None, 'email': None}
     #api.get_users(kv, requestor='u_HYanxon00001')
     #api.get_all_unapproved_users()
@@ -1276,6 +1276,11 @@ if __name__ == '__main__':
     api.add_user_to_role('u_HKrish00003','Admin')
     api.create_user('John', 'Smith', 'smithj123@gmail.com', '333-444-555-1')        # uuid: u_JSmith00004
     api.add_user_to_role('u_JSmith00004', 'MLE User')
+
+    api.create_user('Kobe', 'Bryant', 'kbryant@gmail.com', '223-456-789-0')
+    api.create_user('Lebron', 'James', 'ljames@gmail.com', '323-456-789-0')
+    api.create_user('Michael', 'Jordan', 'mjordan@gmail.com', '423-456-789-0')
+    api.create_user('Anthony', 'Davis', 'adavis@gmail.com', '623-456-789-0')
 
     # Add compute location
     api.create_compute(name='MLSandbox', hostname='mlsandbox.als.lbl.gov')
