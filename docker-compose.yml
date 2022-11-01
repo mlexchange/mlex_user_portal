@@ -16,7 +16,7 @@ services:
       - NEO4J_AUTH=neo4j/MsQID79KFQuS
       - NEO4JLABS_PLUGINS=["apoc"]
     networks:
-      - mlex_network
+      - computing_api_default
 
   front-end:
     depends_on:
@@ -30,12 +30,12 @@ services:
     volumes:
       - "./user_portal/src:/app/work/src"
     ports:
-      - '9050:8050'
+      - '9050:9050'
     environment:
       - USER_API=user-api:5000
       - NEO4J_PASSWORD=MsQID79KFQuS
     networks:
-      - mlex_network
+      - computing_api_default
 
   user-api:
           #restart: "unless-stopped"
@@ -55,8 +55,8 @@ services:
     depends_on:
       - neo4j
     networks:
-      - mlex_network
+      - computing_api_default
 
 networks:
-   mlex_network:
+   computing_api_default:
      external: true
