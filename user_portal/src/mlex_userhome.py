@@ -4,6 +4,14 @@ import dash_bootstrap_components as dbc
 from dashapp import app, USER_API_ADDR, get_user_info
 import requests
 
+#------------------- Golobal Vars---------------------------
+JOB_KEYS = ['description', 'service_type', 'submission_time', 'execution_time', 'job_status']
+APP_KEYS = ['name', 'version', 'owner', 'uri', 'description']
+
+
+#------------------- app contents --------------------------
+app_list = requests.get('http://content-api:8000/api/v0/apps').json()
+
 #--------------------------------------- App Layout Preparation ---------------------------------
 
 # Create buttons for team management navigation
@@ -24,8 +32,127 @@ team_input_groups = [
     ])
 ]
 
-# Create compute_table container
+# Create buttons for app and jobs panel
+app_job_group = [
+    dbc.InputGroup([
+        dbc.Col(dbc.Button(
+            "Select apps to launch",
+            outline=True,
+            color="primary",
+            id="app-button",
+            n_clicks = 0,
+            style={"text-transform": "none", "width":"100%"}), align="left"),
+        dbc.Col(dbc.Button(
+            "Apps running status",
+            outline=True,
+            color="primary",
+            id="job-button",
+            n_clicks = 0,
+            style={"text-transform": "none", "width":"100%"}), align="right")
+    ])
+]
 
+# Application Panel
+def generate_apps_panel(user_id):
+    apps_layout = dbc.Collapse(
+        id='app-tab',
+        children=[
+            html.Div(html.H4("Available apps")),
+            dbc.Button(
+                "Launch",
+                id = "launch-app-button",
+                color = "success",
+                size="sm",
+                n_clicks = 0,
+                style = {'width':'20%'}
+            ),
+            dcc.Dropdown(
+                # To do: api call to retrieve available apps
+                options = [
+                    {'label': 'ColorWheel', 'value': 'colorwheel'},
+                    {'label': 'LabelMaker', 'value': 'labelmaker'},
+                    {'label': 'Image Segmentation', 'value': 'imagesegmentation'}
+                    ],
+                id = 'apps-dropdown',
+                placeholder = "Select Applications",
+            ),
+            dash_table.DataTable(
+                id='table-model-list',
+                columns=[{'id': p, 'name': p} for p in APP_KEYS],
+                data=app_list,
+                row_selectable='multi',
+                page_size=4,
+                editable=False,
+                style_cell={'padding': '0.5rem', 'textAlign': 'left'},
+                css=[{"selector": ".show-hide", "rule": "display: none"}],
+                style_table={'height':'10rem', 'overflowY': 'auto'}
+            ), 
+            html.Div(id='Status-display'),
+            ],
+        is_open = True 
+    )
+    return apps_layout
+
+# Jobs Panel
+def generate_jobs_panel(user_id):
+    table_jobs = dbc.Collapse(
+        id ='job-tab',
+        children = [
+                html.Div(
+                    children = [
+                        html.Div(html.H4("Apps running status")),
+                        dbc.Button(
+                            "Refresh List",
+                            id="button-refresh-jobs",
+                            className="mtb-2",
+                            color="primary",
+                            size="sm",
+                            n_clicks=0,
+                            style = {'width':'20%'}
+                        ),
+                        dbc.Button(
+                            "Terminate the Selected",
+                            id="terminate-user-jobs",
+                            className="m-2",
+                            color="warning",
+                            size="sm",
+                            n_clicks=0,
+                            style = {'width':'20%'}
+                        ),
+                        dbc.Button(
+                            "Open the Selected Frontend App(s)",
+                            id="button-open-window",
+                            className="mtb-2",
+                            color="success",
+                            size="sm",
+                            n_clicks=0,
+                            style = {'width':'20%'}),
+                    ],
+                    className='row',
+                    style={'align-items': 'center', 'margin-left': '1px'}
+                ),
+                html.Div(
+                    children = [
+                    dash_table.DataTable(
+                        id='table-job-list',
+                        columns=[{'id': p, 'name': p} for p in JOB_KEYS],
+                        data=[],
+                        row_selectable='multi',
+                        page_size=10,
+                        editable=False,
+                        style_cell={'padding': '0.5rem', 'textAlign': 'left'},
+                        css=[{"selector": ".show-hide", "rule": "display: none"}],
+                        style_table={'height':'20rem', 'overflowY': 'auto'}
+                    ),
+                ]),
+        ],
+        is_open = True
+    )
+        
+    return table_jobs
+
+
+# Create compute_table container
 def generate_compute_table(user_id):
   compute_url = USER_API_ADDR + "/api/v0/users/" + str(user_id) + "/compute/"
 
@@ -428,6 +555,9 @@ unapproved_users_button = [
             style={"text-transform": "none", "width":"100%"}), align="left"),
     ])
 ]
+
+
+
 #--------------------------------------- App Layout ---------------------------------
 # Setting up initial webpage layout
 
@@ -436,8 +566,11 @@ def generate_layout(fname, lname, user_id, is_admin):
   admin_section = dbc.Container([])
 
   t_team_layout = generate_team_layout(user_id)
+  apps_panel = generate_apps_panel(user_id)
+  jobs_panel = generate_jobs_panel(user_id)
   compute_table = generate_compute_table(user_id)
 
+# Admin panel for user management
   if is_admin:
       admin_section = dbc.Container([
             dbc.Row(
@@ -456,6 +589,7 @@ def generate_layout(fname, lname, user_id, is_admin):
             )
         ])
 
+# Grand layout
   layout = html.Div(
     [
         dbc.Container([
@@ -471,6 +605,22 @@ def generate_layout(fname, lname, user_id, is_admin):
         ]),
         admin_section,
         dbc.Container([
+            # Apps and Jobs
+            dbc.Row(
+                dbc.Card(
+                    children=[
+                        dbc.CardHeader(html.H2("Launch Apps", style={"textAlign":"center"})),
+                        dbc.CardBody([
+                            dbc.Row(html.Div(app_job_group, style={'width':'100%', 'margin-bottom':'10px'})),
+                            dbc.Row([
+                                html.Div(apps_panel),
+                                html.Div(jobs_panel)
+                            ])
+                        ])
+                    ]
+                )
+            ),
+            # Team management
             dbc.Row(
                 dbc.Card(
                     children=[
@@ -492,6 +642,8 @@ def generate_layout(fname, lname, user_id, is_admin):
                     ]
                 )
             ),
+            
+            # Computing Resources
             dbc.Row(
                 dbc.Card(
                     children=[
@@ -536,7 +688,7 @@ def generate_layout(fname, lname, user_id, is_admin):
 
   return layout
 
-## REACTIVE CALLBACKS ##
+#----------REACTIVE CALLBACKS-------------------------#
 
 @app.callback(
    Output('unapproved-user-table', 'data'),
@@ -779,3 +931,148 @@ def rem_from_compute(n, email, hostname):
         return "", "User's access has been removed."
     else:
         return "", ""
+
+#----------------Launch Application Callbacks----------------------------#
+@app.callback(
+    Output('app-tab', 'is_open'),
+    Output('job-tab', 'is_open'),
+    Input('app-button', 'n_clicks'),
+    Input('job-button', 'n_clicks'),
+    State('app-tab', 'is_open'),
+    State('job-tab', 'is_open'),
+    prevent_initial_call=True
+)
+def launch_panel(n1, n2, is_open1, is_open2):
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+    if 'app-button' in changed_id:
+        is_open1 = not is_open1
+    
+    if 'job-button' in changed_id:
+        is_open2 = not is_open2
+
+    return is_open1, is_open2
+
+
+def job_content_dict(content, user_id):
+    job_content = {'mlex_app': content['name'],
+                   'service_type': content['service_type'],
+                   'working_directory': f'/data/mlexchange_store/{user_id}',
+                   'job_kwargs': {'uri': content['uri'], 
+                                  'cmd': content['cmd'][0]}
+    }
+    if 'map' in content:
+        job_content['job_kwargs']['map'] = content['map']
+    
+    return job_content
+
+
+@app.callback(
+    Output("dummy", "data"),
+    Input("launch-app-button", "n_clicks"),
+    Input("terminate-user-jobs", "n_clicks"),
+    State('table-model-list', 'data'),
+    State('table-model-list', 'selected_rows'),
+    State("table-job-list", "data"),
+    State('table-job-list', 'selected_rows'),
+    prevent_initial_call=True,
+)
+def apps_jobs(n_clicks, n_terminate, data, rows, job_data, job_rows):
+    token_info = get_user_info()
+    user_id = token_info.get("user_id")
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+    if "launch-app-button.n_clicks" in changed_id:
+        print('Launching a job')
+        job_request = {'user_uid': user_id,
+                        'host_list': ['mlsandbox.als.lbl.gov', 'local.als.lbl.gov', 'vaughan.als.lbl.gov'],
+                        'requirements': {'num_processors': 2,
+                                         'num_gpus': 0,
+                                         'num_nodes': 2},
+                      }
+                    
+        job_list = []
+        dependency = {}
+        job_names = ''
+        if bool(rows):
+            for i,row in enumerate(rows):
+                job_content = job_content_dict(data[row], user_id)
+                job_list.append(job_content) 
+                dependency[str(i)] = []  #all modes and apps are regarded as independent at this time
+                job_names += job_content['mlex_app'] + ', '
+    
+        job_request['job_list'] = job_list
+        job_request['dependencies'] = dependency
+        job_request['description'] = 'parallel workflow: ' + job_names
+        if len(job_list) == 1:
+            job_request['requirements']['num_nodes'] = 1
+        response = requests.post('http://job-service:8080/api/v0/workflows', json=job_request)
+        
+    if "terminate-user-jobs.n_clicks" in changed_id:
+        print('Terminating jobs')
+        if bool(job_rows):
+            for job_row in job_rows:
+                job_id = job_data[job_row]['uid']
+                print(f'terminate uid {job_id}')
+                response = requests.patch(f'http://job-service:8080/api/v0/jobs/{job_id}/terminate')
+    
+    return ''
+
+
+@app.callback(
+    Output("table-job-list", "data"),
+    Input("button-refresh-jobs", "n_clicks"),
+    prevent_initial_call=True,
+)
+def refresh_jobs_table(n):
+    token_info = get_user_info()
+    user_id = token_info.get("user_id")
+    job_list = []
+    response_get = requests.get(f'http://job-service:8080/api/v0/jobs?user={user_id}').json()
+    for i,job in enumerate(response_get):
+        job_uid = job['uid']
+        job['submission_time'] = job['timestamps']['submission_time']
+        job['execution_time'] = job['timestamps']['execution_time']
+        job['job_status'] = job['status']['state']
+        job['description'] = job['job_kwargs']['uri']
+        job_list.append(job)
+
+    return job_list
+
+
+@app.callback(
+    Output("web-urls", "data"),
+    Input("button-open-window", "n_clicks"),
+    State("table-job-list", "data"),
+    State('table-job-list', 'selected_rows'),
+    prevent_initial_call=True,
+)
+def update_app_url(n_clicks, jobs, rows):
+    web_urls = []
+    if bool(rows):
+        for row in rows:
+            if jobs[row]['service_type'] == 'frontend' and 'map' in jobs[row]['job_kwargs']:
+                mapping = jobs[row]['job_kwargs']['map']
+                for key in mapping:
+                    port = mapping.get(key)
+                    if port:
+                        port=port[0]["HostPort"]
+                        web_url = f"http://mlsandbox.als.lbl.gov:{port}"    #f"https://{port}.mlexchangebeta.als.lbl.gov"
+                        web_urls.append(web_url)
+    
+    return web_urls
+
+
+app.clientside_callback(
+    """
+    function(web_urls) {
+        for (let i = 0; i < web_urls.length; i++) { 
+            window.open(web_urls[i]);
+        }
+        return '';
+    }
+    """,
+    Output('dummy1', 'data'),
+    Input('web-urls', 'data'),
+)
+
+
+
